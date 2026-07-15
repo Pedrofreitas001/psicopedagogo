@@ -29,7 +29,7 @@ export default function Home() {
   }[];
 
   const cards = [
-    { label: "Conexões ativas", value: stats.conexoes, href: "/connections", hint: "VTEX · Zendesk · Power BI" },
+    { label: "Conexões ativas", value: stats.conexoes, href: "/connections", hint: "VTEX · Zendesk · Power BI · Mídia" },
     { label: "Ativos governados", value: stats.ativos, href: "/catalog", hint: `${stats.sensiveis} com sensibilidade LGPD alta` },
     { label: "Agentes de IA", value: stats.agentes, href: "/agents", hint: `${stats.execucoes} execuções acumuladas` },
     { label: "Custo de IA acumulado", value: `US$ ${stats.custo.toFixed(2)}`, href: "/agents", hint: "soma de todos os agentes" },

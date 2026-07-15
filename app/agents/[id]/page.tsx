@@ -11,6 +11,8 @@ export default async function AgentPage({ params }: { params: Promise<{ id: stri
     | {
         id: number; nome: string; objetivo: string; prompt_base: string; modelo: string;
         ferramentas: string; assets_autorizados: string; pode_exibir_pii: number;
+        personalidade: string; escopo_trabalho: string; fora_escopo: string;
+        diretrizes: string; restricoes: string;
         custo_acumulado: number; execucoes: number;
       }
     | undefined;
@@ -39,6 +41,11 @@ export default async function AgentPage({ params }: { params: Promise<{ id: stri
           ferramentas: JSON.parse(agent.ferramentas),
           assets_autorizados: JSON.parse(agent.assets_autorizados),
           pode_exibir_pii: !!agent.pode_exibir_pii,
+          personalidade: JSON.parse(agent.personalidade || "{}"),
+          escopo_trabalho: agent.escopo_trabalho ?? "",
+          fora_escopo: agent.fora_escopo ?? "",
+          diretrizes: JSON.parse(agent.diretrizes || "[]"),
+          restricoes: JSON.parse(agent.restricoes || "[]"),
         }}
         tools={TOOLS_META}
         assets={assets}

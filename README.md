@@ -41,6 +41,39 @@ sidebar para ver o RBAC em ação). Para resetar o demo, apague `data/hub.db`.
 6. **Dashboards** → o dashboard salvo no passo 1 reaparece idêntico (spec JSON renderizada
    pelo Dynamic UI Engine).
 
+## Conexões reais
+
+Além do modo demo, a aba **Conexões → Nova conexão real** aceita credenciais de contas
+reais e puxa dados direto das APIs:
+
+- **VTEX**: account name + AppKey/AppToken → Orders API (100 pedidos mais recentes) e
+  busca pública do catálogo (50 produtos).
+- **Zendesk**: subdomínio + OAuth bearer token (ou email + API token legado) →
+  Tickets API com sideload de usuários (100 tickets mais recentes).
+- **Power BI**: tenant ID + client ID + client secret + workspace ID (service principal) →
+  metadados de relatórios e datasets.
+
+O fluxo: as credenciais são testadas contra a API real antes de salvar → o segredo vai
+criptografado para o Vault → `sync()` grava os dados nas tabelas de origem e cria os
+DataAssets no catálogo → os agentes passam a responder sobre os dados reais. Erros de
+credencial retornam mensagens amigáveis (401/403/404/429) e tudo é auditado.
+
+## Marketing
+
+A aba **Marketing** traz: KPIs de mídia (investimento, receita atribuída, ROAS, CAC),
+ROAS por canal, insights automáticos (melhor canal, campanhas com ROAS < 1 candidatas a
+pausa, criativo fatigado por CTR baixo) e o **Estúdio de criativos** — gera variações de
+copy por canal/objetivo/tom usando preço e categoria reais do catálogo. O Agente de
+Marketing responde no chat: "qual o ROAS por canal?", "gere um criativo para X".
+
+## Agentes com personalidade completa
+
+Cada agente define: identidade (nome, modelo, objetivo, prompt base), personalidade
+(tom de voz, idioma, público-alvo), escopo de trabalho (o que faz / o que NÃO faz),
+diretrizes e restrições invioláveis, skills MCP e ativos autorizados, política de PII.
+O editor mostra o **prompt composto** final — exatamente o que o Agent Runtime envia ao
+modelo quando o Claude Agent SDK for plugado.
+
 ## Arquitetura (mapeada ao PRD)
 
 | Camada do PRD | Onde está no código |

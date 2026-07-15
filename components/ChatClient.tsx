@@ -10,6 +10,8 @@ const SUGESTOES = [
   "Quantos tickets abertos temos hoje?",
   "Quais os produtos mais vendidos?",
   "Qual o CSAT médio por categoria?",
+  "Qual o ROAS por canal de mídia?",
+  "Gere um criativo para o Notebook Vector no Meta Ads",
   "Quais relatórios já existem no Power BI?",
   "Mostre a fila de suporte em kanban",
 ];

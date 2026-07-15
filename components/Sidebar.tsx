@@ -7,6 +7,7 @@ const NAV = [
   { href: "/", label: "Visão geral", icon: "M3 12l9-8 9 8M5 10v10h5v-6h4v6h5V10" },
   { href: "/assistant", label: "Assistente", icon: "M8 10h8M8 14h5M21 12a9 9 0 11-4.6-7.9L21 3l-.9 4.6A8.96 8.96 0 0121 12z" },
   { href: "/agents", label: "Agentes", icon: "M12 2v3M8 21v-2a4 4 0 014-4 4 4 0 014 4v2M12 13a4 4 0 100-8 4 4 0 000 8zM4 9h2M18 9h2" },
+  { href: "/marketing", label: "Marketing", icon: "M3 11l14-5v12L3 13v-2zM17 8a3 3 0 010 8M7 13v5a2 2 0 002 2h1v-6" },
   { href: "/connections", label: "Conexões", icon: "M9 12h6M7 8l-4 4 4 4M17 8l4 4-4 4" },
   { href: "/catalog", label: "Data Catalog", icon: "M4 6c0-1.5 3.6-3 8-3s8 1.5 8 3-3.6 3-8 3-8-1.5-8-3zM4 6v12c0 1.5 3.6 3 8 3s8-1.5 8-3V6M4 12c0 1.5 3.6 3 8 3s8-1.5 8-3" },
   { href: "/queries", label: "Queries", icon: "M8 9l-3 3 3 3M16 9l3 3-3 3M13 5l-2 14" },

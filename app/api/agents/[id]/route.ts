@@ -15,11 +15,17 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
   if (!agent) return NextResponse.json({ error: "Agente não encontrado" }, { status: 404 });
 
   const body = await req.json();
-  const scalar = ["nome", "objetivo", "prompt_base", "modelo"] as const;
+  const scalar = ["nome", "objetivo", "prompt_base", "modelo", "escopo_trabalho", "fora_escopo"] as const;
   const changes: string[] = [];
   for (const field of scalar) {
     if (body[field] !== undefined) {
       db.prepare(`UPDATE agents SET ${field} = ? WHERE id = ?`).run(body[field], agent.id);
+      changes.push(field);
+    }
+  }
+  for (const field of ["personalidade", "diretrizes", "restricoes"] as const) {
+    if (body[field] !== undefined) {
+      db.prepare(`UPDATE agents SET ${field} = ? WHERE id = ?`).run(JSON.stringify(body[field]), agent.id);
       changes.push(field);
     }
   }

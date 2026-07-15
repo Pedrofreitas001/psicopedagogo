@@ -6,7 +6,8 @@ export default function AgentsPage() {
   const db = getDb();
   const agents = db.prepare("SELECT * FROM agents WHERE workspace_id = 1 ORDER BY id").all() as {
     id: number; nome: string; objetivo: string; modelo: string; ferramentas: string;
-    pode_exibir_pii: number; custo_acumulado: number; execucoes: number;
+    pode_exibir_pii: number; personalidade: string; escopo_trabalho: string;
+    custo_acumulado: number; execucoes: number;
   }[];
   const project = db.prepare("SELECT nome FROM projects WHERE id = 1").get() as { nome: string } | undefined;
 
@@ -28,6 +29,7 @@ export default function AgentsPage() {
       <div className="grid grid-cols-1 gap-4">
         {agents.map((a) => {
           const tools = JSON.parse(a.ferramentas) as string[];
+          const pers = JSON.parse(a.personalidade || "{}") as { tom?: string; publico?: string };
           return (
             <Link key={a.id} href={`/agents/${a.id}`} className="rounded-xl border border-black/10 bg-white p-5 hover:border-[var(--brand)]/40 transition-colors block">
               <div className="flex items-center justify-between">
@@ -52,7 +54,12 @@ export default function AgentsPage() {
                 <span className={`text-[11.5px] rounded-full px-2 py-0.5 ${a.pode_exibir_pii ? "bg-red-50 text-red-700" : "bg-emerald-50 text-emerald-700"}`}>
                   {a.pode_exibir_pii ? "PII em claro" : "🔒 PII mascarado"}
                 </span>
+                {pers.tom && <span className="text-[11.5px] rounded-full bg-amber-50 text-amber-800 px-2 py-0.5">tom {pers.tom}</span>}
+                {pers.publico && <span className="text-[11.5px] rounded-full bg-black/5 text-[var(--ink-2)] px-2 py-0.5">para {pers.publico}</span>}
               </div>
+              {a.escopo_trabalho && (
+                <p className="text-[12px] text-[var(--ink-muted)] mt-2 line-clamp-1">Escopo: {a.escopo_trabalho}</p>
+              )}
             </Link>
           );
         })}

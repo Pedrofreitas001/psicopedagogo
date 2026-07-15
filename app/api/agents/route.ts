@@ -17,8 +17,9 @@ export async function POST(req: Request) {
   if (!body.nome?.trim()) return NextResponse.json({ error: "Nome é obrigatório" }, { status: 400 });
   const db = getDb();
   const info = db.prepare(
-    `INSERT INTO agents (workspace_id, nome, objetivo, prompt_base, modelo, ferramentas, assets_autorizados, pode_exibir_pii)
-     VALUES (1, ?, ?, ?, ?, ?, ?, ?)`
+    `INSERT INTO agents (workspace_id, nome, objetivo, prompt_base, modelo, ferramentas, assets_autorizados, pode_exibir_pii,
+                         personalidade, escopo_trabalho, fora_escopo, diretrizes, restricoes)
+     VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   ).run(
     body.nome.trim(),
     body.objetivo ?? "",
@@ -26,7 +27,12 @@ export async function POST(req: Request) {
     body.modelo ?? "claude-sonnet-5",
     JSON.stringify(body.ferramentas ?? []),
     JSON.stringify(body.assets_autorizados ?? []),
-    body.pode_exibir_pii ? 1 : 0
+    body.pode_exibir_pii ? 1 : 0,
+    JSON.stringify(body.personalidade ?? {}),
+    body.escopo_trabalho ?? "",
+    body.fora_escopo ?? "",
+    JSON.stringify(body.diretrizes ?? []),
+    JSON.stringify(body.restricoes ?? [])
   );
   audit(user.nome, "agent.create", body.nome.trim(), `Ferramentas: ${(body.ferramentas ?? []).join(", ") || "nenhuma"}.`);
   return NextResponse.json({ id: info.lastInsertRowid });

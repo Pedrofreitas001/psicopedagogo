@@ -1,4 +1,5 @@
 import { getDb, audit, maskEmail, maskCpf } from "./db";
+import { gerarCriativos } from "./creative";
 import type { ChatResponse, ChatSource, UISpec } from "./types";
 
 /**
@@ -22,6 +23,8 @@ export const TOOL_LABELS: Record<string, string> = {
   "zendesk.tickets": "Zendesk · Tickets",
   "powerbi.relatorios": "Power BI · Relatórios",
   "cross.vendas_suporte": "Cruzamento Vendas × Suporte",
+  "marketing.campanhas": "Marketing · Campanhas",
+  "marketing.criativos": "Marketing · Criativos",
   "catalogo.busca": "Data Catalog · Busca",
 };
 
@@ -31,6 +34,7 @@ type AgentRow = {
   modelo: string;
   ferramentas: string;
   pode_exibir_pii: number;
+  escopo_trabalho: string;
 };
 
 type Intent = {
@@ -60,6 +64,10 @@ export function detectIntent(q: string): Intent {
   const temTicket = /(ticket|suporte|atendimento|reclama|chamad)/i.test(q);
   const temVenda = /(pedido|compra|venda|fatur|receita|cliente|gasta|produto|r\$)/i.test(q);
 
+  if (/(criativo|copy|anúncio para|texto de anúncio)/i.test(q))
+    return { id: "marketing_criativo", tools: ["marketing.criativos"], params };
+  if (/(roas|cac\b|campanha|mídia paga|ads\b|ctr\b|investimento em (mídia|marketing)|verba)/i.test(q))
+    return { id: "marketing_analise", tools: ["marketing.campanhas"], params };
   if (temTicket && /(compra|pedido|acima de|gasta|clientes que)/i.test(q))
     return { id: "cross", tools: ["cross.vendas_suporte"], params: { minTotal: params.minTotal ?? 500, days: params.days ?? 30, ...params } };
   if (temTicket && /(kanban|quadro)/i.test(q))
@@ -88,7 +96,7 @@ export function detectIntent(q: string): Intent {
 /** Escolhe agentes do projeto que cobrem as ferramentas exigidas. */
 function pickAgents(required: string[], forcedAgentId?: number): { agents: AgentRow[]; missing: string[] } {
   const db = getDb();
-  const all = db.prepare("SELECT id, nome, modelo, ferramentas, pode_exibir_pii FROM agents WHERE workspace_id = 1").all() as AgentRow[];
+  const all = db.prepare("SELECT id, nome, modelo, ferramentas, pode_exibir_pii, escopo_trabalho FROM agents WHERE workspace_id = 1").all() as AgentRow[];
   const toolsOf = (a: AgentRow) => JSON.parse(a.ferramentas) as string[];
 
   if (forcedAgentId) {
@@ -129,11 +137,112 @@ function pickAgents(required: string[], forcedAgentId?: number): { agents: Agent
 
 type ExecResult = { answer: string; blocks: UISpec[]; sources: ChatSource[]; usesPii: boolean };
 
-function execIntent(intent: Intent, mask: boolean): ExecResult {
+function execIntent(intent: Intent, mask: boolean, question = ""): ExecResult {
   const db = getDb();
   const p = intent.params;
 
   switch (intent.id) {
+    case "marketing_analise": {
+      const canais = db.prepare(
+        `SELECT canal, SUM(investimento) inv, SUM(receita) rec, SUM(conversoes) conv, SUM(cliques) cli, SUM(impressoes) imp
+         FROM marketing_campaigns GROUP BY canal ORDER BY rec DESC`
+      ).all() as { canal: string; inv: number; rec: number; conv: number; cli: number; imp: number }[];
+      const camps = db.prepare(
+        `SELECT nome, canal, status, investimento, receita, conversoes, cliques, impressoes FROM marketing_campaigns ORDER BY receita DESC`
+      ).all() as { nome: string; canal: string; status: string; investimento: number; receita: number; conversoes: number; cliques: number; impressoes: number }[];
+      if (!camps.length) {
+        return { answer: "Nenhuma campanha sincronizada ainda — conecte uma fonte de mídia na aba Conexões.", usesPii: false, sources: [], blocks: [] };
+      }
+      const inv = canais.reduce((s, c) => s + c.inv, 0);
+      const rec = canais.reduce((s, c) => s + c.rec, 0);
+      const conv = canais.reduce((s, c) => s + c.conv, 0);
+      const ruins = camps.filter((c) => c.status === "ativa" && c.receita / c.investimento < 1);
+      const melhor = [...canais].sort((a, b) => b.rec / b.inv - a.rec / a.inv)[0];
+      return {
+        answer:
+          `Nos dados de mídia: investimento total de ${fmtBRL(inv)}, receita atribuída de ${fmtBRL(rec)} (ROAS ${(rec / inv).toFixed(2)}) e CAC médio de ${fmtBRL(inv / Math.max(conv, 1))}. ` +
+          `O melhor canal é ${melhor.canal} (ROAS ${(melhor.rec / melhor.inv).toFixed(2)}).` +
+          (ruins.length ? ` Atenção: ${ruins.map((r) => `“${r.nome}”`).join(", ")} está(ão) com ROAS abaixo de 1 — candidata(s) a pausa.` : "") +
+          ` Fonte: Campanhas de Mídia.`,
+        usesPii: false,
+        sources: [{ asset: "Campanhas de Mídia", connection: "Mídia Paga — Meta & Google (demo)" }],
+        blocks: [
+          {
+            type: "kpi",
+            items: [
+              { label: "Investimento", value: fmtBRL(inv) },
+              { label: "Receita atribuída", value: fmtBRL(rec), hint: `ROAS ${(rec / inv).toFixed(2)}` },
+              { label: "CAC médio", value: fmtBRL(inv / Math.max(conv, 1)), hint: `${conv} conversões` },
+            ],
+          },
+          {
+            type: "chart",
+            chartType: "bar",
+            title: "ROAS por canal",
+            data: canais.map((c) => ({ label: c.canal, value: Math.round((c.rec / c.inv) * 100) / 100 })),
+          },
+          {
+            type: "table",
+            title: "Campanhas (por receita)",
+            columns: [
+              { key: "nome", label: "Campanha" },
+              { key: "canal", label: "Canal" },
+              { key: "status", label: "Status" },
+              { key: "investimento", label: "Investimento", align: "right" },
+              { key: "receita", label: "Receita", align: "right" },
+              { key: "roas", label: "ROAS", align: "right" },
+              { key: "cac", label: "CAC", align: "right" },
+            ],
+            rows: camps.map((c) => ({
+              nome: c.nome,
+              canal: c.canal,
+              status: c.status,
+              investimento: fmtBRL(c.investimento),
+              receita: fmtBRL(c.receita),
+              roas: (c.receita / c.investimento).toFixed(2),
+              cac: c.conversoes ? fmtBRL(c.investimento / c.conversoes) : "—",
+            })),
+          },
+        ],
+      };
+    }
+
+    case "marketing_criativo": {
+      const produtos = db.prepare("SELECT id, nome, categoria, preco FROM vtex_products ORDER BY id").all() as
+        { id: number; nome: string; categoria: string; preco: number }[];
+      if (!produtos.length) {
+        return { answer: "Não há produtos sincronizados para basear o criativo — sincronize a conexão VTEX primeiro.", usesPii: false, sources: [], blocks: [] };
+      }
+      const qLower = question.toLowerCase();
+      const alvo =
+        produtos.find((pr) => qLower.includes(pr.nome.toLowerCase())) ??
+        produtos.find((pr) => pr.nome.toLowerCase().split(" ").some((w) => w.length > 4 && qLower.includes(w))) ??
+        produtos[0];
+      const canal = /google/i.test(question) ? "google" : /tiktok/i.test(question) ? "tiktok" : /e-?mail/i.test(question) ? "email" : "meta";
+      const tom = /urgen/i.test(question) ? "urgente" : /amig|leve|descontra/i.test(question) ? "amigável" : "profissional";
+      const variantes = gerarCriativos({ produto: alvo, canal, objetivo: "conversão", tom });
+      return {
+        answer: `Gerei 3 variações de criativo para “${alvo.nome}” (${canal}, tom ${tom}), usando preço e categoria reais do catálogo. Refine na aba Marketing → Estúdio de criativos.`,
+        usesPii: false,
+        sources: [
+          { asset: "Produtos", connection: "VTEX" },
+          { asset: "Campanhas de Mídia", connection: "Mídia Paga" },
+        ],
+        blocks: [
+          {
+            type: "table",
+            title: `Criativos — ${alvo.nome} (${canal})`,
+            columns: [
+              { key: "angulo", label: "Ângulo" },
+              { key: "headline", label: "Headline" },
+              { key: "corpo", label: "Texto" },
+              { key: "cta", label: "CTA" },
+            ],
+            rows: variantes.map((v) => ({ angulo: v.angulo, headline: v.headline, corpo: v.corpo, cta: v.cta })),
+          },
+        ],
+      };
+    }
     case "cross": {
       const min = p.minTotal ?? 500;
       const days = p.days ?? 30;
@@ -534,7 +643,7 @@ function execIntent(intent: Intent, mask: boolean): ExecResult {
     default:
       return {
         answer:
-          "Posso responder perguntas sobre os dados conectados. Exemplos: “quais os tickets mais frequentes de clientes que compraram acima de R$500 no último mês?”, “qual o faturamento dos últimos 30 dias?”, “quantos tickets abertos temos hoje?”, “quais os produtos mais vendidos?”, “qual o CSAT médio?”, “quais relatórios já existem no Power BI?”.",
+          "Posso responder perguntas sobre os dados conectados. Exemplos: “quais os tickets mais frequentes de clientes que compraram acima de R$500 no último mês?”, “qual o faturamento dos últimos 30 dias?”, “qual o ROAS por canal?”, “gere um criativo para o produto mais vendido”, “quantos tickets abertos temos hoje?”, “quais relatórios já existem no Power BI?”.",
         usesPii: false,
         sources: [],
         blocks: [],
@@ -558,6 +667,7 @@ export function executeQuestion(question: string, forcedAgentId?: number): ChatR
     return {
       answer:
         `${nome} não tem autorização para as ferramentas necessárias (${missing.map((m) => TOOL_LABELS[m] ?? m).join(", ")}). ` +
+        (agent?.escopo_trabalho ? `Escopo definido deste agente: ${agent.escopo_trabalho} ` : "") +
         `Por governança, agentes só acessam o que foi explicitamente autorizado — selecione outro agente ou ajuste as skills dele na aba Agentes.`,
       blocks: [],
       agents: agent ? [{ id: agent.id, nome: agent.nome }] : [],
@@ -578,7 +688,7 @@ export function executeQuestion(question: string, forcedAgentId?: number): ChatR
 
   // LGPD: mascara PII a menos que TODOS os agentes executores tenham permissão explícita.
   const mask = agents.length === 0 || agents.some((a) => !a.pode_exibir_pii);
-  const result = execIntent(intent, mask);
+  const result = execIntent(intent, mask, question);
 
   // Custo simulado por execução (em produção: tokens reais do Agent SDK)
   const custo = agents.length ? Math.round((0.004 + result.answer.length * 0.00002) * agents.length * 10000) / 10000 : 0;

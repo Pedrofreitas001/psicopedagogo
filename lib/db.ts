@@ -38,16 +38,32 @@ function resolveDataDir(): string {
   }
 }
 
+/** Versão do schema. DBs demo antigos são recriados; a partir daqui, migrações preservam dados. */
+const SCHEMA_VERSION = 2;
+
 export function getDb(): Database.Database {
   if (_db) return _db;
   const dir = resolveDataDir();
   const file = path.join(dir, "hub.db");
-  const fresh = !fs.existsSync(file);
   _db = new Database(file);
   _db.pragma("journal_mode = WAL");
+
+  const version = _db.pragma("user_version", { simple: true }) as number;
+  const hasTables = !!_db
+    .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='workspaces'")
+    .get();
+  if (hasTables && version < SCHEMA_VERSION) wipe(_db); // DB demo de versão antiga: recria
+
   migrate(_db);
-  if (fresh) seed(_db);
+  const seeded = (_db.prepare("SELECT COUNT(*) c FROM workspaces").get() as { c: number }).c > 0;
+  if (!seeded) seed(_db);
+  _db.pragma(`user_version = ${SCHEMA_VERSION}`);
   return _db;
+}
+
+function wipe(db: Database.Database) {
+  const tables = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'").all() as { name: string }[];
+  for (const t of tables) db.exec(`DROP TABLE IF EXISTS ${t.name}`);
 }
 
 function migrate(db: Database.Database) {
@@ -62,7 +78,7 @@ function migrate(db: Database.Database) {
   );
   CREATE TABLE IF NOT EXISTS connections (
     id INTEGER PRIMARY KEY, workspace_id INTEGER NOT NULL REFERENCES workspaces(id),
-    tipo TEXT NOT NULL CHECK (tipo IN ('vtex','zendesk','powerbi')),
+    tipo TEXT NOT NULL,
     nome TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'conectado',
     ultima_sincronizacao TEXT, config TEXT
   );
@@ -99,6 +115,11 @@ function migrate(db: Database.Database) {
     ferramentas TEXT NOT NULL DEFAULT '[]',
     assets_autorizados TEXT NOT NULL DEFAULT '[]',
     pode_exibir_pii INTEGER NOT NULL DEFAULT 0,
+    personalidade TEXT NOT NULL DEFAULT '{}',
+    escopo_trabalho TEXT NOT NULL DEFAULT '',
+    fora_escopo TEXT NOT NULL DEFAULT '',
+    diretrizes TEXT NOT NULL DEFAULT '[]',
+    restricoes TEXT NOT NULL DEFAULT '[]',
     custo_acumulado REAL NOT NULL DEFAULT 0,
     execucoes INTEGER NOT NULL DEFAULT 0,
     criado_em TEXT NOT NULL DEFAULT (datetime('now'))
@@ -124,9 +145,9 @@ function migrate(db: Database.Database) {
   );
   CREATE TABLE IF NOT EXISTS vtex_orders (
     id INTEGER PRIMARY KEY, connection_id INTEGER NOT NULL,
-    cliente_nome TEXT NOT NULL, cliente_email TEXT NOT NULL, cliente_cpf TEXT NOT NULL,
-    produto_id INTEGER NOT NULL REFERENCES vtex_products(id),
-    quantidade INTEGER NOT NULL, total REAL NOT NULL,
+    cliente_nome TEXT NOT NULL, cliente_email TEXT NOT NULL DEFAULT '', cliente_cpf TEXT NOT NULL DEFAULT '',
+    produto_id INTEGER,
+    quantidade INTEGER NOT NULL DEFAULT 1, total REAL NOT NULL,
     status TEXT NOT NULL, criado_em TEXT NOT NULL
   );
   CREATE TABLE IF NOT EXISTS zendesk_tickets (
@@ -138,6 +159,14 @@ function migrate(db: Database.Database) {
   CREATE TABLE IF NOT EXISTS powerbi_reports (
     id INTEGER PRIMARY KEY, connection_id INTEGER NOT NULL,
     nome TEXT NOT NULL, dataset TEXT NOT NULL, descricao TEXT NOT NULL, atualizado_em TEXT NOT NULL
+  );
+  CREATE TABLE IF NOT EXISTS marketing_campaigns (
+    id INTEGER PRIMARY KEY, connection_id INTEGER NOT NULL,
+    nome TEXT NOT NULL, canal TEXT NOT NULL, objetivo TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'ativa',
+    investimento REAL NOT NULL, impressoes INTEGER NOT NULL, cliques INTEGER NOT NULL,
+    conversoes INTEGER NOT NULL, receita REAL NOT NULL,
+    inicio TEXT NOT NULL, fim TEXT
   );
   `);
 }
@@ -176,9 +205,10 @@ function seed(db: Database.Database) {
   const insConn = db.prepare(
     "INSERT INTO connections (id, workspace_id, tipo, nome, status, ultima_sincronizacao, config) VALUES (?, 1, ?, ?, 'conectado', ?, ?)"
   );
-  insConn.run(1, "vtex", "VTEX — Loja Acme", daysAgo(0, 8), JSON.stringify({ account: "acmestore", environment: "vtexcommercestable" }));
-  insConn.run(2, "zendesk", "Zendesk — Suporte Acme", daysAgo(0, 8), JSON.stringify({ subdomain: "acmesuporte", auth: "oauth2" }));
-  insConn.run(3, "powerbi", "Power BI — Workspace Comercial", daysAgo(0, 8), JSON.stringify({ tenant: "acme.onmicrosoft.com", auth: "service_principal" }));
+  insConn.run(1, "vtex", "VTEX — Loja Acme (demo)", daysAgo(0, 8), JSON.stringify({ demo: true, account: "acmestore", environment: "vtexcommercestable" }));
+  insConn.run(2, "zendesk", "Zendesk — Suporte Acme (demo)", daysAgo(0, 8), JSON.stringify({ demo: true, subdomain: "acmesuporte", authType: "oauth_bearer" }));
+  insConn.run(3, "powerbi", "Power BI — Workspace Comercial (demo)", daysAgo(0, 8), JSON.stringify({ demo: true, tenantId: "acme.onmicrosoft.com", workspaceId: "demo" }));
+  insConn.run(4, "ads", "Mídia Paga — Meta & Google (demo)", daysAgo(0, 8), JSON.stringify({ demo: true, contas: ["act_demo_meta", "google-123-456"] }));
 
   const insCred = db.prepare(
     "INSERT INTO credentials (connection_id, tipo, valor_criptografado, escopo, expira_em) VALUES (?, ?, ?, ?, ?)"
@@ -264,6 +294,24 @@ function seed(db: Database.Database) {
   const insRep = db.prepare("INSERT INTO powerbi_reports (connection_id, nome, dataset, descricao, atualizado_em) VALUES (3, ?, ?, ?, ?)");
   reports.forEach((r, i) => insRep.run(r[0], r[1], r[2], daysAgo(i % 3, 6)));
 
+  // ── Dados de origem: Mídia Paga (campanhas) ────────────────────────────
+  const campanhas: [string, string, string, string, number, number, number, number, number, number][] = [
+    // nome, canal, objetivo, status, investimento, impressões, cliques, conversões, receita, início (dias atrás)
+    ["Remarketing Eletrônicos", "meta", "conversão", "ativa", 12500, 890000, 21400, 512, 98400, 45],
+    ["Prospecção Lookalike 2%", "meta", "conversão", "ativa", 18200, 1450000, 26800, 388, 61300, 60],
+    ["Search Marca", "google", "conversão", "ativa", 6400, 210000, 15800, 402, 84500, 90],
+    ["Search Genérico Eletrônicos", "google", "conversão", "ativa", 22800, 980000, 19200, 231, 39800, 60],
+    ["YouTube Awareness Q3", "google", "alcance", "pausada", 9500, 2100000, 8400, 41, 6900, 30],
+    ["TikTok Ofertas Julho", "tiktok", "conversão", "ativa", 7800, 1650000, 31200, 154, 21700, 15],
+    ["Email Recompra 60d", "email", "retenção", "ativa", 1200, 145000, 9800, 236, 47300, 60],
+    ["Display Retargeting", "google", "conversão", "encerrada", 4300, 760000, 5100, 38, 5200, 90],
+  ];
+  const insCamp = db.prepare(
+    `INSERT INTO marketing_campaigns (connection_id, nome, canal, objetivo, status, investimento, impressoes, cliques, conversoes, receita, inicio, fim)
+     VALUES (4, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+  );
+  for (const c of campanhas) insCamp.run(c[0], c[1], c[2], c[3], c[4], c[5], c[6], c[7], c[8], daysAgo(c[9]), c[3] === "encerrada" ? daysAgo(10) : null);
+
   // ── Data Catalog (o que o sync() dos conectores popula) ────────────────
   const insAsset = db.prepare(
     `INSERT INTO data_assets (id, workspace_id, connection_id, nome, tipo, owner_id, steward_id, area, descricao, sensibilidade_lgpd, campos_sensiveis, linhas)
@@ -273,11 +321,13 @@ function seed(db: Database.Database) {
   insAsset.run(2, 1, "Produtos", "tabela", 1, 2, "Vendas", "Catálogo de produtos da VTEX (Catalog API): nome, categoria e preço.", "baixa", "[]", 10);
   insAsset.run(3, 2, "Tickets", "tabela", 1, 2, "Atendimento", "Tickets do Zendesk (Tickets API): assunto, categoria, status, prioridade, CSAT e solicitante.", "media", JSON.stringify(["requester_email"]), 60);
   insAsset.run(4, 3, "Relatórios Power BI", "dataset", 1, 2, "Analytics", "Metadados de relatórios e datasets do workspace Power BI (REST API, leitura).", "baixa", "[]", 6);
+  insAsset.run(5, 4, "Campanhas de Mídia", "tabela", 1, 2, "Marketing", "Campanhas de mídia paga (Meta, Google, TikTok, email): investimento, cliques, conversões e receita atribuída.", "baixa", "[]", 8);
 
   const insRel = db.prepare("INSERT INTO asset_relationships (asset_origem_id, asset_destino_id, tipo) VALUES (?, ?, ?)");
   insRel.run(1, 2, "referencia (produto_id)");
   insRel.run(1, 3, "cruza por email do cliente");
   insRel.run(4, 1, "consome dados de");
+  insRel.run(5, 1, "atribui receita a");
 
   // ── Biblioteca de Queries ──────────────────────────────────────────────
   const insQuery = db.prepare(
@@ -299,16 +349,23 @@ function seed(db: Database.Database) {
 
   // ── Agentes ────────────────────────────────────────────────────────────
   const insAgent = db.prepare(
-    `INSERT INTO agents (id, workspace_id, nome, objetivo, prompt_base, modelo, ferramentas, assets_autorizados, pode_exibir_pii, custo_acumulado, execucoes)
-     VALUES (?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    `INSERT INTO agents (id, workspace_id, nome, objetivo, prompt_base, modelo, ferramentas, assets_autorizados, pode_exibir_pii,
+                         personalidade, escopo_trabalho, fora_escopo, diretrizes, restricoes, custo_acumulado, execucoes)
+     VALUES (?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   );
   insAgent.run(
     1, "Agente de Vendas",
     "Responder perguntas sobre pedidos, produtos, faturamento e clientes da loja VTEX.",
-    "Você é um analista de vendas da Acme. Responda com números exatos, sempre citando a fonte (tabela e conector). Nunca exiba CPF ou email em claro.",
+    "Você é um analista de vendas da Acme. Responda com números exatos, sempre citando a fonte (tabela e conector).",
     "claude-sonnet-5",
     JSON.stringify(["vtex.pedidos", "vtex.produtos", "catalogo.busca"]),
-    JSON.stringify([1, 2]), 0, 4.21, 37
+    JSON.stringify([1, 2]), 0,
+    JSON.stringify({ tom: "direto", idioma: "pt-BR", publico: "diretoria comercial" }),
+    "Análises de faturamento, ticket médio, ranking de produtos e clientes da loja VTEX.",
+    "Não responde sobre suporte, marketing ou dados que não venham da VTEX.",
+    JSON.stringify(["Sempre excluir pedidos cancelados dos números de receita", "Citar o período analisado em toda resposta"]),
+    JSON.stringify(["Nunca exibir CPF ou email em claro"]),
+    4.21, 37
   );
   insAgent.run(
     2, "Agente de Suporte",
@@ -316,7 +373,13 @@ function seed(db: Database.Database) {
     "Você é um analista de atendimento da Acme. Priorize visão de fila (abertos/pendentes) e aponte categorias recorrentes.",
     "claude-haiku-4-5",
     JSON.stringify(["zendesk.tickets", "catalogo.busca"]),
-    JSON.stringify([3]), 0, 1.87, 52
+    JSON.stringify([3]), 0,
+    JSON.stringify({ tom: "amigável", idioma: "pt-BR", publico: "time de atendimento" }),
+    "Visão de fila (abertos/pendentes), categorias recorrentes e CSAT do Zendesk.",
+    "Não responde sobre vendas, faturamento ou campanhas de marketing.",
+    JSON.stringify(["Destacar tickets de prioridade alta primeiro", "Sugerir a categoria com pior CSAT como foco da semana"]),
+    JSON.stringify(["Não expor o email completo dos solicitantes"]),
+    1.87, 52
   );
   insAgent.run(
     3, "Analista Cross (Vendas × Suporte)",
@@ -324,15 +387,36 @@ function seed(db: Database.Database) {
     "Você cruza dados de VTEX e Zendesk para achar padrões (ex.: clientes de alto valor com problemas recorrentes) e aponta o relatório Power BI certo para aprofundar.",
     "claude-sonnet-5",
     JSON.stringify(["vtex.pedidos", "zendesk.tickets", "cross.vendas_suporte", "powerbi.relatorios", "catalogo.busca"]),
-    JSON.stringify([1, 2, 3, 4]), 0, 9.63, 21
+    JSON.stringify([1, 2, 3, 4]), 0,
+    JSON.stringify({ tom: "técnico", idioma: "pt-BR", publico: "analistas de dados e gestores" }),
+    "Cruzamentos entre vendas (VTEX) e suporte (Zendesk); indicação do relatório Power BI certo para cada análise.",
+    "Não recria dashboards que já existem no Power BI; não altera dados nas origens.",
+    JSON.stringify(["Explicitar a chave de cruzamento usada (email do cliente)", "Indicar o relatório Power BI relacionado quando existir"]),
+    JSON.stringify(["Nunca exibir PII em claro", "Não extrapolar conclusões sem dado que sustente"]),
+    9.63, 21
+  );
+  insAgent.run(
+    4, "Agente de Marketing",
+    "Analisar performance de campanhas de mídia paga e gerar criativos alinhados à marca.",
+    "Você é um estrategista de growth da Acme. Analisa ROAS, CAC e CTR por canal e campanha, recomenda otimizações de verba e escreve copies para Meta, Google, TikTok e email.",
+    "claude-sonnet-5",
+    JSON.stringify(["marketing.campanhas", "marketing.criativos", "vtex.produtos", "catalogo.busca"]),
+    JSON.stringify([2, 5]), 0,
+    JSON.stringify({ tom: "amigável", idioma: "pt-BR", publico: "time de growth e mídia" }),
+    "Análises de ROAS/CAC/CTR por canal e campanha; recomendações de realocação de verba; geração de criativos (copy) por canal e objetivo.",
+    "Não altera campanhas nas plataformas; não promete resultados; não cria peças visuais finais (apenas copy e conceito).",
+    JSON.stringify(["Sempre reportar ROAS e CAC juntos", "Recomendar pausar campanhas com ROAS < 1", "Copies nunca prometem desconto que não existe na loja"]),
+    JSON.stringify(["Não usar dados pessoais de clientes em criativos", "Não citar concorrentes nominalmente"]),
+    2.34, 12
   );
 
-  db.prepare("INSERT INTO projects (id, workspace_id, nome, agentes) VALUES (1, 1, 'Operação Comercial', ?)").run(JSON.stringify([1, 2, 3]));
+  db.prepare("INSERT INTO projects (id, workspace_id, nome, agentes) VALUES (1, 1, 'Operação Comercial', ?)").run(JSON.stringify([1, 2, 3, 4]));
 
   const insLog = db.prepare("INSERT INTO audit_logs (workspace_id, ator, acao, alvo, detalhe, timestamp) VALUES (1, ?, ?, ?, ?, ?)");
-  insLog.run("sistema", "connector.sync", "VTEX — Loja Acme", "95 pedidos e 10 produtos sincronizados; DataAssets atualizados no catálogo.", daysAgo(0, 8));
-  insLog.run("sistema", "connector.sync", "Zendesk — Suporte Acme", "60 tickets sincronizados via OAuth 2.0.", daysAgo(0, 8));
-  insLog.run("sistema", "connector.sync", "Power BI — Workspace Comercial", "6 relatórios catalogados (service principal, rate limit ok).", daysAgo(0, 8));
+  insLog.run("sistema", "connector.sync", "VTEX — Loja Acme (demo)", "95 pedidos e 10 produtos sincronizados; DataAssets atualizados no catálogo.", daysAgo(0, 8));
+  insLog.run("sistema", "connector.sync", "Zendesk — Suporte Acme (demo)", "60 tickets sincronizados via OAuth 2.0.", daysAgo(0, 8));
+  insLog.run("sistema", "connector.sync", "Power BI — Workspace Comercial (demo)", "6 relatórios catalogados (service principal, rate limit ok).", daysAgo(0, 8));
+  insLog.run("sistema", "connector.sync", "Mídia Paga — Meta & Google (demo)", "8 campanhas sincronizadas com métricas de investimento e receita.", daysAgo(0, 8));
   insLog.run("Ana Souza", "catalog.update", "Pedidos", "Campos cliente_email e cliente_cpf marcados como sensíveis (LGPD).", daysAgo(1, 15));
   insLog.run("Pedro Freitas", "vault.read", "Credencial VTEX (api_key)", "Leitura de credencial para health-check do conector.", daysAgo(1, 9));
 }

@@ -5,5 +5,7 @@ export const TOOLS_META = [
   { id: "zendesk.tickets", label: "Zendesk · Tickets", desc: "Consulta tickets, fila, categorias e CSAT (OAuth 2.0)" },
   { id: "powerbi.relatorios", label: "Power BI · Relatórios", desc: "Cita e explica relatórios existentes (metadados, leitura)" },
   { id: "cross.vendas_suporte", label: "Cruzamento Vendas × Suporte", desc: "Cruza pedidos VTEX com tickets Zendesk pelo email do cliente" },
+  { id: "marketing.campanhas", label: "Marketing · Campanhas", desc: "Analisa ROAS, CAC e CTR das campanhas de mídia paga" },
+  { id: "marketing.criativos", label: "Marketing · Criativos", desc: "Gera variações de copy por canal, objetivo e tom" },
   { id: "catalogo.busca", label: "Data Catalog · Busca", desc: "Lista e busca ativos governados do catálogo" },
 ];
