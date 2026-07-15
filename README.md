@@ -12,6 +12,13 @@ npm install
 npm run dev        # http://localhost:3000
 ```
 
+### Deploy na Vercel
+
+Funciona sem configuração: em ambiente serverless o filesystem é somente leitura, então o
+SQLite é criado em `/tmp` e **ressemeado a cada cold start** — os dados demo sempre aparecem,
+mas dashboards/edições salvos são efêmeros. Para persistência real em produção, migrar para
+Postgres (o schema já está pronto para isso, ver "Decisões do MVP").
+
 Na primeira execução o banco SQLite (`data/hub.db`) é criado e populado com dados demo dos
 três conectores (95 pedidos VTEX, 60 tickets Zendesk, 6 relatórios Power BI), 3 agentes
 configurados e 1 workspace com 3 usuários (admin / steward / viewer — troque pelo seletor na

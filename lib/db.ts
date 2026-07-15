@@ -1,6 +1,7 @@
 import Database from "better-sqlite3";
 import path from "path";
 import fs from "fs";
+import os from "os";
 import { encrypt } from "./vault";
 
 /**
@@ -14,10 +15,32 @@ import { encrypt } from "./vault";
 
 let _db: Database.Database | null = null;
 
+/**
+ * Escolhe um diretório gravável para o arquivo SQLite. Em ambientes
+ * serverless (Vercel/Lambda) o filesystem do projeto é somente leitura,
+ * então caímos para /tmp — o banco demo é ressemeado a cada cold start,
+ * o que é aceitável para o MVP (para persistência real: Postgres).
+ */
+function resolveDataDir(): string {
+  if (process.env.DB_DIR) {
+    fs.mkdirSync(process.env.DB_DIR, { recursive: true });
+    return process.env.DB_DIR;
+  }
+  const local = path.join(process.cwd(), "data");
+  try {
+    fs.mkdirSync(local, { recursive: true });
+    fs.accessSync(local, fs.constants.W_OK);
+    return local;
+  } catch {
+    const tmp = path.join(os.tmpdir(), "governance-hub");
+    fs.mkdirSync(tmp, { recursive: true });
+    return tmp;
+  }
+}
+
 export function getDb(): Database.Database {
   if (_db) return _db;
-  const dir = path.join(process.cwd(), "data");
-  fs.mkdirSync(dir, { recursive: true });
+  const dir = resolveDataDir();
   const file = path.join(dir, "hub.db");
   const fresh = !fs.existsSync(file);
   _db = new Database(file);
