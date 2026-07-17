@@ -39,7 +39,7 @@ function resolveDataDir(): string {
 }
 
 /** Versão do schema. DBs demo antigos são recriados; a partir daqui, migrações preservam dados. */
-const SCHEMA_VERSION = 4;
+const SCHEMA_VERSION = 5;
 
 export function getDb(): Database.Database {
   if (_db) return _db;
@@ -74,7 +74,8 @@ function migrate(db: Database.Database) {
   );
   CREATE TABLE IF NOT EXISTS users (
     id INTEGER PRIMARY KEY, workspace_id INTEGER NOT NULL REFERENCES workspaces(id),
-    nome TEXT NOT NULL, email TEXT NOT NULL, papel TEXT NOT NULL CHECK (papel IN ('admin','steward','viewer'))
+    nome TEXT NOT NULL, email TEXT NOT NULL, papel TEXT NOT NULL CHECK (papel IN ('admin','steward','viewer')),
+    auth_id TEXT
   );
   CREATE TABLE IF NOT EXISTS connections (
     id INTEGER PRIMARY KEY, workspace_id INTEGER NOT NULL REFERENCES workspaces(id),

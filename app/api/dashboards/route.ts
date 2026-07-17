@@ -9,6 +9,7 @@ export async function GET() {
 
 export async function POST(req: Request) {
   const user = await getCurrentUser();
+  if (!user) return NextResponse.json({ error: "Não autenticado." }, { status: 401 });
   const body = await req.json();
   if (!body.titulo?.trim() || !body.spec_json) {
     return NextResponse.json({ error: "titulo e spec_json são obrigatórios" }, { status: 400 });

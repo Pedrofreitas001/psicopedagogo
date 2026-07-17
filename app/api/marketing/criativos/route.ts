@@ -5,6 +5,7 @@ import { gerarCriativos, type CreativeInput } from "@/lib/creative";
 
 export async function POST(req: Request) {
   const user = await getCurrentUser();
+  if (!user) return NextResponse.json({ error: "Não autenticado." }, { status: 401 });
   const body = await req.json();
   const db = getDb();
   const produto = db.prepare("SELECT nome, categoria, preco FROM vtex_products WHERE id = ?").get(Number(body.produtoId)) as

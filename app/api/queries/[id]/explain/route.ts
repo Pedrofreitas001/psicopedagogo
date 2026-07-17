@@ -11,6 +11,7 @@ export async function POST(_req: Request, ctx: { params: Promise<{ id: string }>
   const { id } = await ctx.params;
   const db = getDb();
   const user = await getCurrentUser();
+  if (!user) return NextResponse.json({ error: "Não autenticado." }, { status: 401 });
   const q = db.prepare("SELECT * FROM queries WHERE id = ? AND workspace_id = 1").get(Number(id)) as
     | { id: number; titulo: string; sql: string }
     | undefined;

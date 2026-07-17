@@ -8,6 +8,7 @@ export async function POST(_req: Request, ctx: { params: Promise<{ id: string }>
   const { id } = await ctx.params;
   const db = getDb();
   const user = await getCurrentUser();
+  if (!user) return NextResponse.json({ error: "Não autenticado." }, { status: 401 });
   const asset = db.prepare("SELECT id, nome FROM data_assets WHERE id = ? AND workspace_id = 1").get(Number(id)) as
     | { id: number; nome: string }
     | undefined;

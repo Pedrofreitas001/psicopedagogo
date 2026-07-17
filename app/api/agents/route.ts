@@ -10,6 +10,7 @@ export async function GET() {
 
 export async function POST(req: Request) {
   const user = await getCurrentUser();
+  if (!user) return NextResponse.json({ error: "Não autenticado." }, { status: 401 });
   if (!canEdit(user.papel)) {
     return NextResponse.json({ error: "Seu papel (viewer) não permite criar agentes." }, { status: 403 });
   }

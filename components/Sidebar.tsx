@@ -42,13 +42,17 @@ const ROLE_LABEL: Record<string, string> = { admin: "Admin", steward: "Steward",
 export default function Sidebar({
   users,
   currentUserId,
+  currentUserPapel,
   workspaceName,
   plano,
+  authMode,
 }: {
   users: { id: number; nome: string; papel: string }[];
   currentUserId: number;
+  currentUserPapel: string;
   workspaceName: string;
   plano: string;
+  authMode: boolean;
 }) {
   const pathname = usePathname();
   const router = useRouter();
@@ -56,6 +60,12 @@ export default function Sidebar({
 
   async function switchUser(uid: string) {
     await fetch("/api/session", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ uid }) });
+    router.refresh();
+  }
+
+  async function logout() {
+    await fetch("/api/auth/logout", { method: "POST" });
+    router.push("/login");
     router.refresh();
   }
 
@@ -110,20 +120,37 @@ export default function Sidebar({
             plano {plano}
           </span>
         </div>
-        <label className="block text-xs text-[var(--ink-muted)] pt-1">
-          Usuário atual (demo de RBAC)
-          <select
-            className="mt-1 w-full rounded-md border border-black/10 bg-white px-2 py-1.5 text-[13px] text-[var(--ink-1)]"
-            value={current.id}
-            onChange={(e) => switchUser(e.target.value)}
-          >
-            {users.map((u) => (
-              <option key={u.id} value={u.id}>
-                {u.nome} · {ROLE_LABEL[u.papel]}
-              </option>
-            ))}
-          </select>
-        </label>
+        {authMode ? (
+          <div className="pt-1">
+            <div className="flex items-center gap-2.5">
+              <div className="h-8 w-8 rounded-full bg-[var(--brand)]/12 text-[var(--brand)] grid place-items-center text-[13px] font-semibold shrink-0">
+                {(current?.nome ?? "?").slice(0, 1).toUpperCase()}
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="text-[13px] font-medium truncate">{current?.nome}</div>
+                <div className="text-[11px] text-[var(--ink-muted)]">{ROLE_LABEL[currentUserPapel] ?? currentUserPapel}</div>
+              </div>
+              <button onClick={logout} title="Sair" className="text-[12px] text-[var(--ink-muted)] hover:text-red-600 shrink-0">
+                Sair
+              </button>
+            </div>
+          </div>
+        ) : (
+          <label className="block text-xs text-[var(--ink-muted)] pt-1">
+            Usuário atual (demo de RBAC)
+            <select
+              className="mt-1 w-full rounded-md border border-black/10 bg-white px-2 py-1.5 text-[13px] text-[var(--ink-1)]"
+              value={current.id}
+              onChange={(e) => switchUser(e.target.value)}
+            >
+              {users.map((u) => (
+                <option key={u.id} value={u.id}>
+                  {u.nome} · {ROLE_LABEL[u.papel]}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
       </div>
     </aside>
   );

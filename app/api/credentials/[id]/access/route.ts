@@ -12,6 +12,7 @@ export async function POST(_req: Request, ctx: { params: Promise<{ id: string }>
   const { id } = await ctx.params;
   const db = getDb();
   const user = await getCurrentUser();
+  if (!user) return NextResponse.json({ error: "Não autenticado." }, { status: 401 });
   if (user.papel === "viewer") {
     return NextResponse.json({ error: "Apenas admin/steward podem acessar credenciais." }, { status: 403 });
   }

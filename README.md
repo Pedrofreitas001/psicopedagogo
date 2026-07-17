@@ -12,6 +12,19 @@ npm install
 npm run dev        # http://localhost:3000
 ```
 
+### Autenticação (Supabase Auth)
+
+Com `SUPABASE_URL` + `SUPABASE_ANON_KEY` definidos (env vars da Vercel ou `.env.local`),
+a plataforma inteira passa a exigir **login real**: páginas redirecionam para `/login`,
+APIs respondem 401, sessão em cookie httpOnly com renovação automática de token.
+Provisionamento no primeiro acesso: email igual a um usuário semeado herda o papel
+(ex.: pedrofreitas@usp.br → admin); primeiro login real do workspace vira admin; demais
+entram como viewer. Sem as env vars, cai no modo demo (seletor de usuário na sidebar).
+
+Importante no projeto Supabase: em **Authentication → URL Configuration**, defina o
+Site URL como a URL do app (ex.: `https://governance-hub-mvp.vercel.app`) para o link de
+confirmação de email apontar para o lugar certo.
+
 ### Deploy na Vercel
 
 Funciona sem configuração: em ambiente serverless o filesystem é somente leitura, então o

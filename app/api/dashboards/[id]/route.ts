@@ -5,6 +5,7 @@ import { getCurrentUser, canEdit } from "@/lib/auth";
 export async function DELETE(_req: Request, ctx: { params: Promise<{ id: string }> }) {
   const { id } = await ctx.params;
   const user = await getCurrentUser();
+  if (!user) return NextResponse.json({ error: "Não autenticado." }, { status: 401 });
   if (!canEdit(user.papel)) {
     return NextResponse.json({ error: "Seu papel (viewer) não permite excluir dashboards." }, { status: 403 });
   }
