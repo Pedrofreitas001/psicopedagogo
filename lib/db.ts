@@ -39,7 +39,7 @@ function resolveDataDir(): string {
 }
 
 /** Versão do schema. DBs demo antigos são recriados; a partir daqui, migrações preservam dados. */
-const SCHEMA_VERSION = 3;
+const SCHEMA_VERSION = 4;
 
 export function getDb(): Database.Database {
   if (_db) return _db;
@@ -97,7 +97,33 @@ function migrate(db: Database.Database) {
     linhas INTEGER NOT NULL DEFAULT 0,
     tabela_origem TEXT NOT NULL DEFAULT '',
     nome_original TEXT NOT NULL DEFAULT '',
+    entidade TEXT NOT NULL DEFAULT '',
     criado_em TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+  -- Layer 2 (Modelo Semântico): significado de cada coluna de um ativo
+  CREATE TABLE IF NOT EXISTS asset_columns (
+    id INTEGER PRIMARY KEY,
+    asset_id INTEGER NOT NULL REFERENCES data_assets(id),
+    coluna TEXT NOT NULL,
+    nome_semantico TEXT NOT NULL DEFAULT '',
+    tipo_dado TEXT NOT NULL DEFAULT 'texto',
+    papel TEXT NOT NULL DEFAULT 'dimensao' CHECK (papel IN ('dimensao','medida','data','chave','ignorar')),
+    cardinalidade INTEGER,
+    exemplo TEXT,
+    confirmado INTEGER NOT NULL DEFAULT 0,
+    UNIQUE (asset_id, coluna)
+  );
+  -- Layer 3 (Modelo Analítico): KPIs definidos sobre o modelo semântico
+  CREATE TABLE IF NOT EXISTS kpis (
+    id INTEGER PRIMARY KEY, workspace_id INTEGER NOT NULL REFERENCES workspaces(id),
+    nome TEXT NOT NULL, descricao TEXT NOT NULL DEFAULT '',
+    asset_id INTEGER NOT NULL REFERENCES data_assets(id),
+    agregacao TEXT NOT NULL CHECK (agregacao IN ('sum','avg','count','count_distinct','min','max')),
+    coluna_medida TEXT,
+    coluna_data TEXT,
+    coluna_dimensao TEXT,
+    formato TEXT NOT NULL DEFAULT 'numero' CHECK (formato IN ('numero','moeda','percentual')),
+    criado_por TEXT, criado_em TEXT NOT NULL DEFAULT (datetime('now'))
   );
   CREATE TABLE IF NOT EXISTS asset_relationships (
     id INTEGER PRIMARY KEY,
@@ -323,14 +349,23 @@ function seed(db: Database.Database) {
 
   // ── Data Catalog (o que o sync() dos conectores popula) ────────────────
   const insAsset = db.prepare(
-    `INSERT INTO data_assets (id, workspace_id, connection_id, nome, tipo, owner_id, steward_id, area, descricao, sensibilidade_lgpd, campos_sensiveis, linhas, tabela_origem, nome_original)
-     VALUES (?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    `INSERT INTO data_assets (id, workspace_id, connection_id, nome, tipo, owner_id, steward_id, area, descricao, sensibilidade_lgpd, campos_sensiveis, linhas, tabela_origem, nome_original, entidade)
+     VALUES (?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   );
-  insAsset.run(1, 1, "Pedidos", "tabela", 1, 2, "Vendas", "Pedidos da loja VTEX (Orders API): cliente, itens, total, status e data.", "alta", JSON.stringify(["cliente_email", "cliente_cpf"]), 95, "vtex_orders", "orders");
-  insAsset.run(2, 1, "Produtos", "tabela", 1, 2, "Vendas", "Catálogo de produtos da VTEX (Catalog API): nome, categoria e preço.", "baixa", "[]", 10, "vtex_products", "products");
-  insAsset.run(3, 2, "Tickets", "tabela", 1, 2, "Atendimento", "Tickets do Zendesk (Tickets API): assunto, categoria, status, prioridade, CSAT e solicitante.", "media", JSON.stringify(["requester_email"]), 60, "zendesk_tickets", "tickets");
-  insAsset.run(4, 3, "Relatórios Power BI", "dataset", 1, 2, "Analytics", "Metadados de relatórios e datasets do workspace Power BI (REST API, leitura).", "baixa", "[]", 6, "powerbi_reports", "reports");
-  insAsset.run(5, 4, "Campanhas de Mídia", "tabela", 1, 2, "Marketing", "Campanhas de mídia paga (Meta, Google, TikTok, email): investimento, cliques, conversões e receita atribuída.", "baixa", "[]", 8, "marketing_campaigns", "campaigns");
+  insAsset.run(1, 1, "Pedidos", "tabela", 1, 2, "Vendas", "Pedidos da loja VTEX (Orders API): cliente, itens, total, status e data.", "alta", JSON.stringify(["cliente_email", "cliente_cpf"]), 95, "vtex_orders", "orders", "Pedidos");
+  insAsset.run(2, 1, "Produtos", "tabela", 1, 2, "Vendas", "Catálogo de produtos da VTEX (Catalog API): nome, categoria e preço.", "baixa", "[]", 10, "vtex_products", "products", "Produtos");
+  insAsset.run(3, 2, "Tickets", "tabela", 1, 2, "Atendimento", "Tickets do Zendesk (Tickets API): assunto, categoria, status, prioridade, CSAT e solicitante.", "media", JSON.stringify(["requester_email"]), 60, "zendesk_tickets", "tickets", "Tickets");
+  insAsset.run(4, 3, "Relatórios Power BI", "dataset", 1, 2, "Analytics", "Metadados de relatórios e datasets do workspace Power BI (REST API, leitura).", "baixa", "[]", 6, "powerbi_reports", "reports", "Relatórios");
+  insAsset.run(5, 4, "Campanhas de Mídia", "tabela", 1, 2, "Marketing", "Campanhas de mídia paga (Meta, Google, TikTok, email): investimento, cliques, conversões e receita atribuída.", "baixa", "[]", 8, "marketing_campaigns", "campaigns", "Campanhas");
+
+  // ── Layer 3: KPIs de exemplo sobre o modelo semântico ─────────────────
+  const insKpi = db.prepare(
+    `INSERT INTO kpis (workspace_id, nome, descricao, asset_id, agregacao, coluna_medida, coluna_data, coluna_dimensao, formato, criado_por)
+     VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, 'sistema')`
+  );
+  insKpi.run("Faturamento", "Receita total dos pedidos (todos os status, exceto quando filtrado).", 1, "sum", "total", "criado_em", null, "moeda");
+  insKpi.run("Tickets por status", "Volume da fila de suporte quebrado por status.", 3, "count", null, null, "status", "numero");
+  insKpi.run("Investimento em mídia", "Total investido em campanhas, por canal.", 5, "sum", "investimento", null, "canal", "moeda");
 
   const insRel = db.prepare("INSERT INTO asset_relationships (asset_origem_id, asset_destino_id, tipo) VALUES (?, ?, ?)");
   insRel.run(1, 2, "referencia (produto_id)");
@@ -367,7 +402,7 @@ function seed(db: Database.Database) {
     "Responder perguntas sobre pedidos, produtos, faturamento e clientes da loja VTEX.",
     "Você é um analista de vendas da Acme. Responda com números exatos, sempre citando a fonte (tabela e conector).",
     "claude-sonnet-5",
-    JSON.stringify(["vtex.pedidos", "vtex.produtos", "catalogo.busca"]),
+    JSON.stringify(["vtex.pedidos", "vtex.produtos", "analitico.kpis", "catalogo.busca"]),
     JSON.stringify([1, 2]), 0,
     JSON.stringify({ tom: "direto", idioma: "pt-BR", publico: "diretoria comercial" }),
     "Análises de faturamento, ticket médio, ranking de produtos e clientes da loja VTEX.",
@@ -395,7 +430,7 @@ function seed(db: Database.Database) {
     "Cruzar dados de vendas e atendimento e explicar relatórios existentes do Power BI.",
     "Você cruza dados de VTEX e Zendesk para achar padrões (ex.: clientes de alto valor com problemas recorrentes) e aponta o relatório Power BI certo para aprofundar.",
     "claude-sonnet-5",
-    JSON.stringify(["vtex.pedidos", "zendesk.tickets", "cross.vendas_suporte", "powerbi.relatorios", "catalogo.busca"]),
+    JSON.stringify(["vtex.pedidos", "zendesk.tickets", "cross.vendas_suporte", "powerbi.relatorios", "analitico.kpis", "catalogo.busca"]),
     JSON.stringify([1, 2, 3, 4]), 0,
     JSON.stringify({ tom: "técnico", idioma: "pt-BR", publico: "analistas de dados e gestores" }),
     "Cruzamentos entre vendas (VTEX) e suporte (Zendesk); indicação do relatório Power BI certo para cada análise.",
@@ -409,7 +444,7 @@ function seed(db: Database.Database) {
     "Analisar performance de campanhas de mídia paga e gerar criativos alinhados à marca.",
     "Você é um estrategista de growth da Acme. Analisa ROAS, CAC e CTR por canal e campanha, recomenda otimizações de verba e escreve copies para Meta, Google, TikTok e email.",
     "claude-sonnet-5",
-    JSON.stringify(["marketing.campanhas", "marketing.criativos", "vtex.produtos", "catalogo.busca"]),
+    JSON.stringify(["marketing.campanhas", "marketing.criativos", "vtex.produtos", "analitico.kpis", "catalogo.busca"]),
     JSON.stringify([2, 5]), 0,
     JSON.stringify({ tom: "amigável", idioma: "pt-BR", publico: "time de growth e mídia" }),
     "Análises de ROAS/CAC/CTR por canal e campanha; recomendações de realocação de verba; geração de criativos (copy) por canal e objetivo.",

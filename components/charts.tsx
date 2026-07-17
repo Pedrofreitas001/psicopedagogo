@@ -65,7 +65,7 @@ export function LineChart({ data, unit }: { data: { label: string; value: number
         <g key={v}>
           <line x1={pad.l} y1={y(v)} x2={W - pad.r} y2={y(v)} stroke={GRID} strokeWidth="1" />
           <text x={pad.l - 8} y={y(v) + 4} textAnchor="end" fontSize="11" fill={MUTED}>
-            {unit === "R$" ? `${Math.round(v / 1000)}k` : Math.round(v)}
+            {max >= 20000 ? `${Math.round(v / 1000)}k` : Math.round(v).toLocaleString("pt-BR")}
           </text>
         </g>
       ))}

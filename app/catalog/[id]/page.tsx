@@ -2,7 +2,9 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getDb } from "@/lib/db";
 import { getAssetSample } from "@/lib/data-viewer";
+import { listColumns } from "@/lib/semantic";
 import AssetEditor from "@/components/AssetEditor";
+import SemanticColumns from "@/components/SemanticColumns";
 
 export default async function AssetPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -21,6 +23,7 @@ export default async function AssetPage({ params }: { params: Promise<{ id: stri
   if (!asset) notFound();
 
   const sample = getAssetSample(asset);
+  const semanticColumns = listColumns(asset.id);
 
   const users = db.prepare("SELECT id, nome, papel FROM users WHERE workspace_id = 1").all() as { id: number; nome: string; papel: string }[];
   const rels = db.prepare(
@@ -86,6 +89,8 @@ export default async function AssetPage({ params }: { params: Promise<{ id: stri
           )}
         </section>
       )}
+
+      <SemanticColumns assetId={asset.id} initialColumns={semanticColumns} />
 
       <AssetEditor
         asset={{

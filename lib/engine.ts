@@ -1,5 +1,6 @@
 import { getDb, audit, maskEmail, maskCpf } from "./db";
 import { gerarCriativos } from "./creative";
+import { listKpis, computeKpi } from "./kpi";
 import type { ChatResponse, ChatSource, UISpec } from "./types";
 
 /**
@@ -25,6 +26,7 @@ export const TOOL_LABELS: Record<string, string> = {
   "cross.vendas_suporte": "Cruzamento Vendas × Suporte",
   "marketing.campanhas": "Marketing · Campanhas",
   "marketing.criativos": "Marketing · Criativos",
+  "analitico.kpis": "Modelo Analítico · KPIs",
   "catalogo.busca": "Data Catalog · Busca",
 };
 
@@ -40,7 +42,7 @@ type AgentRow = {
 type Intent = {
   id: string;
   tools: string[]; // ferramentas exigidas (uma delas OU todas, ver cross)
-  params: { minTotal?: number; days?: number; status?: string };
+  params: { minTotal?: number; days?: number; status?: string; kpiId?: number };
 };
 
 const fmtBRL = (v: number) =>
@@ -64,6 +66,12 @@ export function detectIntent(q: string): Intent {
   const temTicket = /(ticket|suporte|atendimento|reclama|chamad)/i.test(q);
   const temVenda = /(pedido|compra|venda|fatur|receita|cliente|gasta|produto|r\$)/i.test(q);
 
+  // KPIs do modelo analítico: pergunta cita um KPI salvo pelo nome, ou pede a lista
+  const kpiMatch = listKpis().find((k) => q.toLowerCase().includes(k.nome.toLowerCase()));
+  if (kpiMatch)
+    return { id: "kpi_consulta", tools: ["analitico.kpis"], params: { ...params, kpiId: kpiMatch.id } };
+  if (/\bkpis?\b|indicadores/i.test(q))
+    return { id: "kpi_lista", tools: ["analitico.kpis"], params };
   if (/(criativo|copy|anúncio para|texto de anúncio)/i.test(q))
     return { id: "marketing_criativo", tools: ["marketing.criativos"], params };
   if (/(roas|cac\b|campanha|mídia paga|ads\b|ctr\b|investimento em (mídia|marketing)|verba)/i.test(q))
@@ -142,6 +150,40 @@ function execIntent(intent: Intent, mask: boolean, question = ""): ExecResult {
   const p = intent.params;
 
   switch (intent.id) {
+    case "kpi_consulta": {
+      const kpi = listKpis().find((k) => k.id === p.kpiId);
+      const r = kpi ? computeKpi(kpi) : null;
+      if (!r) return { answer: "Não encontrei esse KPI.", usesPii: false, sources: [], blocks: [] };
+      return {
+        answer: `${r.kpi.nome}: ${r.valor} (${r.kpi.agregacao}${r.kpi.coluna_medida ? ` de ${r.kpi.coluna_medida}` : ""}, sobre ${r.linhas.toLocaleString("pt-BR")} linhas de “${r.assetNome}”). Este valor vem do modelo analítico — a mesma definição usada na aba KPIs e nos dashboards.`,
+        usesPii: false,
+        sources: [{ asset: r.assetNome, connection: r.conexao }],
+        blocks: [{ type: "kpi", items: [{ label: r.kpi.nome, value: r.valor, hint: r.kpi.descricao || undefined }] }, ...r.blocks],
+      };
+    }
+
+    case "kpi_lista": {
+      const resultados = listKpis().map((k) => computeKpi(k)).filter((r) => r !== null);
+      if (!resultados.length) return { answer: "Nenhum KPI definido ainda — crie na aba KPIs ou pelas sugestões do catálogo.", usesPii: false, sources: [], blocks: [] };
+      return {
+        answer: `Existem ${resultados.length} KPIs no modelo analítico. Pergunte pelo nome de qualquer um para ver a análise completa.`,
+        usesPii: false,
+        sources: resultados.map((r) => ({ asset: r!.assetNome, connection: r!.conexao })).filter((s, i, a) => a.findIndex((x) => x.asset === s.asset) === i),
+        blocks: [
+          {
+            type: "table",
+            title: "KPIs do workspace",
+            columns: [
+              { key: "nome", label: "KPI" },
+              { key: "valor", label: "Valor atual", align: "right" },
+              { key: "fonte", label: "Fonte" },
+            ],
+            rows: resultados.map((r) => ({ nome: r!.kpi.nome, valor: r!.valor, fonte: r!.assetNome })),
+          },
+        ],
+      };
+    }
+
     case "marketing_analise": {
       const canais = db.prepare(
         `SELECT canal, SUM(investimento) inv, SUM(receita) rec, SUM(conversoes) conv, SUM(cliques) cli, SUM(impressoes) imp
