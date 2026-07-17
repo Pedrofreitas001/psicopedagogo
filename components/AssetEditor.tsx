@@ -3,14 +3,16 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 
-const CAMPOS_PII = ["cliente_email", "cliente_cpf", "requester_email", "cliente_nome", "telefone"];
+const CAMPOS_PII_PADRAO = ["cliente_email", "cliente_cpf", "requester_email", "cliente_nome", "telefone"];
 
 export default function AssetEditor({
   asset,
   users,
+  camposDisponiveis,
 }: {
   asset: {
     id: number;
+    nome: string;
     descricao: string;
     area: string;
     sensibilidade_lgpd: string;
@@ -19,9 +21,11 @@ export default function AssetEditor({
     steward_id: number | null;
   };
   users: { id: number; nome: string; papel: string }[];
+  camposDisponiveis?: string[];
 }) {
   const router = useRouter();
   const [form, setForm] = useState({ ...asset });
+  const camposPii = Array.from(new Set([...(camposDisponiveis?.length ? camposDisponiveis : CAMPOS_PII_PADRAO), ...asset.campos_sensiveis]));
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -43,16 +47,22 @@ export default function AssetEditor({
 
   return (
     <div className="rounded-xl border border-black/10 bg-white p-5 space-y-4">
-      <h3 className="text-sm font-semibold">Governança do ativo</h3>
+      <h3 className="text-sm font-semibold">Governança e curadoria semântica</h3>
+      <div className="grid grid-cols-2 gap-4">
+        <label className="text-sm">
+          <span className="text-[var(--ink-2)]">Nome de negócio (semântico)</span>
+          <input className={`${input} mt-1`} value={form.nome} onChange={(e) => setForm({ ...form, nome: e.target.value })} placeholder="ex.: Pedidos" />
+        </label>
+        <label className="text-sm">
+          <span className="text-[var(--ink-2)]">Área</span>
+          <input className={`${input} mt-1`} value={form.area} onChange={(e) => setForm({ ...form, area: e.target.value })} />
+        </label>
+      </div>
       <label className="text-sm block">
         <span className="text-[var(--ink-2)]">Descrição</span>
         <textarea rows={2} className={`${input} mt-1`} value={form.descricao} onChange={(e) => setForm({ ...form, descricao: e.target.value })} />
       </label>
       <div className="grid grid-cols-2 gap-4">
-        <label className="text-sm">
-          <span className="text-[var(--ink-2)]">Área</span>
-          <input className={`${input} mt-1`} value={form.area} onChange={(e) => setForm({ ...form, area: e.target.value })} />
-        </label>
         <label className="text-sm">
           <span className="text-[var(--ink-2)]">Sensibilidade LGPD</span>
           <select className={`${input} mt-1`} value={form.sensibilidade_lgpd} onChange={(e) => setForm({ ...form, sensibilidade_lgpd: e.target.value })}>
@@ -83,7 +93,7 @@ export default function AssetEditor({
       <div className="text-sm">
         <span className="text-[var(--ink-2)]">Campos sensíveis (mascarados por padrão nas respostas de agentes)</span>
         <div className="flex flex-wrap gap-2 mt-2">
-          {CAMPOS_PII.map((campo) => {
+          {camposPii.map((campo) => {
             const on = form.campos_sensiveis.includes(campo);
             return (
               <button

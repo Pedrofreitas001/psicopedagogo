@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getDb } from "@/lib/db";
+import { getAssetSample } from "@/lib/data-viewer";
 import AssetEditor from "@/components/AssetEditor";
 
 export default async function AssetPage({ params }: { params: Promise<{ id: string }> }) {
@@ -14,9 +15,12 @@ export default async function AssetPage({ params }: { params: Promise<{ id: stri
     | {
         id: number; nome: string; tipo: string; area: string; descricao: string; sensibilidade_lgpd: string;
         campos_sensiveis: string; linhas: number; conexao: string; owner_id: number | null; steward_id: number | null;
+        connection_id: number | null; tabela_origem: string; nome_original: string;
       }
     | undefined;
   if (!asset) notFound();
+
+  const sample = getAssetSample(asset);
 
   const users = db.prepare("SELECT id, nome, papel FROM users WHERE workspace_id = 1").all() as { id: number; nome: string; papel: string }[];
   const rels = db.prepare(
@@ -39,12 +43,54 @@ export default async function AssetPage({ params }: { params: Promise<{ id: stri
         <h1 className="text-2xl font-semibold mt-1">{asset.nome}</h1>
         <p className="text-sm text-[var(--ink-muted)]">
           {asset.tipo} · {asset.conexao} · {asset.linhas.toLocaleString("pt-BR")} linhas sincronizadas
+          {asset.nome_original && asset.nome_original !== asset.nome && (
+            <> · origem: <code className="bg-black/5 rounded px-1 text-[12px]">{asset.nome_original}</code></>
+          )}
         </p>
       </header>
+
+      {sample && (
+        <section className="rounded-xl border border-black/10 bg-white overflow-hidden">
+          <div className="px-5 pt-4 pb-2 flex items-baseline justify-between">
+            <div>
+              <h3 className="text-sm font-semibold">Amostra dos dados (Layer 1 — ingestão)</h3>
+              <p className="text-[12px] text-[var(--ink-muted)]">
+                Exibindo {sample.rows.length} de {sample.total.toLocaleString("pt-BR")} linhas
+                {sample.masked && <span className="text-emerald-700"> · 🔒 campos sensíveis mascarados (LGPD)</span>}
+              </p>
+            </div>
+          </div>
+          {sample.rows.length === 0 ? (
+            <p className="px-5 pb-4 text-[13px] text-[var(--ink-muted)]">Nenhum dado sincronizado ainda — rode o sync na aba Conexões.</p>
+          ) : (
+            <div className="overflow-x-auto max-h-96 overflow-y-auto">
+              <table className="w-full text-[12.5px]">
+                <thead className="sticky top-0 bg-white">
+                  <tr className="text-left text-[var(--ink-muted)] border-b border-black/5">
+                    {sample.columns.map((c) => (
+                      <th key={c} className="px-4 py-2 font-medium font-mono text-[11.5px]">{c}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {sample.rows.map((row, i) => (
+                    <tr key={i} className="border-b border-black/4 last:border-0 hover:bg-black/2">
+                      {sample.columns.map((c) => (
+                        <td key={c} className="px-4 py-1.5 whitespace-nowrap max-w-64 overflow-hidden text-ellipsis">{row[c]}</td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
+      )}
 
       <AssetEditor
         asset={{
           id: asset.id,
+          nome: asset.nome,
           descricao: asset.descricao,
           area: asset.area,
           sensibilidade_lgpd: asset.sensibilidade_lgpd,
@@ -53,6 +99,7 @@ export default async function AssetPage({ params }: { params: Promise<{ id: stri
           steward_id: asset.steward_id,
         }}
         users={users}
+        camposDisponiveis={sample?.columns}
       />
 
       <div className="grid grid-cols-2 gap-4">

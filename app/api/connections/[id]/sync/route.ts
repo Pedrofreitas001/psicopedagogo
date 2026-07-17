@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { getDb, audit } from "@/lib/db";
 import { decrypt } from "@/lib/vault";
 import { getCurrentUser } from "@/lib/auth";
-import { syncVtex, syncZendesk, syncPowerBi, upsertAssets } from "@/lib/connectors";
+import { syncVtex, syncZendesk, syncPowerBi, syncSupabase, upsertAssets } from "@/lib/connectors";
 
 /**
  * sync() do Connection Hub (Módulo 3). Conexões demo recontam os dados
@@ -36,6 +36,7 @@ export async function POST(_req: Request, ctx: { params: Promise<{ id: string }>
       if (conn.tipo === "vtex") detalhes = (await syncVtex(db, conn.id, config, secret)).detalhes;
       else if (conn.tipo === "zendesk") detalhes = (await syncZendesk(db, conn.id, config, secret)).detalhes;
       else if (conn.tipo === "powerbi") detalhes = (await syncPowerBi(db, conn.id, config, secret)).detalhes;
+      else if (conn.tipo === "supabase") detalhes = (await syncSupabase(db, conn.id, config, secret)).detalhes;
       else return NextResponse.json({ error: `Sync não implementado para o tipo ${conn.tipo}.` }, { status: 400 });
     } catch (e) {
       const msg = (e as Error).message;
@@ -43,7 +44,7 @@ export async function POST(_req: Request, ctx: { params: Promise<{ id: string }>
       audit(user.nome, "connector.sync", conn.nome, `Sincronização FALHOU: ${msg}`);
       return NextResponse.json({ error: msg }, { status: 502 });
     }
-    upsertAssets(db, conn.id, conn.tipo);
+    if (conn.tipo !== "supabase") upsertAssets(db, conn.id, conn.tipo); // Supabase cria assets dinamicamente no próprio sync
   }
 
   db.prepare("UPDATE connections SET status = 'conectado', ultima_sincronizacao = datetime('now') WHERE id = ?").run(conn.id);

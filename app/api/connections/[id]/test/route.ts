@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { getDb, audit } from "@/lib/db";
 import { decrypt } from "@/lib/vault";
 import { getCurrentUser } from "@/lib/auth";
-import { testVtex, testZendesk, testPowerBi, type TestResult } from "@/lib/connectors";
+import { testVtex, testZendesk, testPowerBi, testSupabase, type TestResult } from "@/lib/connectors";
 
 /** Health-check de uma conexão existente contra a API real. */
 export async function POST(_req: Request, ctx: { params: Promise<{ id: string }> }) {
@@ -31,6 +31,7 @@ export async function POST(_req: Request, ctx: { params: Promise<{ id: string }>
     if (conn.tipo === "vtex") result = await testVtex(config, secret);
     else if (conn.tipo === "zendesk") result = await testZendesk(config, secret);
     else if (conn.tipo === "powerbi") result = await testPowerBi(config, secret);
+    else if (conn.tipo === "supabase") result = await testSupabase(config, secret);
     else result = { ok: false, message: `Health-check não implementado para o tipo ${conn.tipo}.` };
   } catch (e) {
     result = { ok: false, message: (e as Error).message };

@@ -41,6 +41,21 @@ sidebar para ver o RBAC em ação). Para resetar o demo, apague `data/hub.db`.
 6. **Dashboards** → o dashboard salvo no passo 1 reaparece idêntico (spec JSON renderizada
    pelo Dynamic UI Engine).
 
+## Visão: Plataforma de Inteligência Empresarial
+
+O produto evolui de "hub de agentes" para **Sistema Operacional de Inteligência
+Empresarial** em 4 camadas — e o código já está organizado nessa direção:
+
+| Camada da visão | O que já existe hoje | Próximo passo |
+|---|---|---|
+| **1. Ingestão** (dados brutos, nada é alterado) | Conectores VTEX/Zendesk/Power BI/Supabase; tabela `raw_records` guarda registros brutos de fontes genéricas | Upload de Excel/CSV |
+| **2. Modelo Semântico** (tabelas viram entidades de negócio) | Data Catalog com nome semântico editável (ex.: `tbl_orders` → "Pedidos"), descrição, área, relacionamentos entre entidades | Semantic Builder conversacional (IA entrevista o usuário) |
+| **3. Modelo Analítico** (métricas e KPIs) | KPIs calculados nos módulos (ROAS, CAC, CSAT, faturamento); Biblioteca de Queries | Definição de métricas pelo usuário, validadas pela IA |
+| **4. Experiência** (consumidores do conhecimento) | Assistente, agentes com escopo, dashboards salvos, insights automáticos de marketing | Brains por domínio nascendo das análises recorrentes |
+
+Princípio central: **agentes, dashboards e automações são consumidores do modelo
+de conhecimento** — não o produto em si.
+
 ## Conexões reais
 
 Além do modo demo, a aba **Conexões → Nova conexão real** aceita credenciais de contas

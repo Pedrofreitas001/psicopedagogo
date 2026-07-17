@@ -18,6 +18,7 @@ export default function NewConnectionPage() {
         <p><strong>VTEX:</strong> gere o par AppKey/AppToken no Admin → Configurações da conta → Chaves de aplicação (perfil com acesso a OMS).</p>
         <p><strong>Zendesk:</strong> prefira OAuth 2.0 (Admin Center → Apps e integrações → APIs → OAuth). API tokens legados estão sendo descontinuados.</p>
         <p><strong>Power BI:</strong> app registration no Entra ID + client secret; adicione o service principal como membro do workspace.</p>
+        <p><strong>Supabase:</strong> URL do projeto (Settings → API) + service_role key. A ingestão lê todas as tabelas expostas no PostgREST (até 20 tabelas × 200 linhas) e cada uma vira um ativo bruto no catálogo, pronto para curadoria semântica.</p>
       </div>
     </div>
   );

@@ -221,6 +221,88 @@ export async function syncPowerBi(db: Database.Database, connectionId: number, c
   return { detalhes: [`Relatórios: ${reports.length} linhas`, `Datasets: ${datasets.length}`] };
 }
 
+// ── Supabase ─────────────────────────────────────────────────────────────
+// Config: { url }  Secret: { apiKey } (service_role para ler tudo, ou anon
+// se as policies permitirem). Usa o PostgREST do próprio projeto: o schema
+// OpenAPI lista as tabelas expostas e cada tabela é lida via REST.
+
+type SupabaseConfig = { url: string };
+
+function supabaseHeaders(secret: { apiKey: string }) {
+  return { apikey: secret.apiKey, Authorization: `Bearer ${secret.apiKey}`, Accept: "application/json" };
+}
+
+function normalizeSupabaseUrl(url: string): string {
+  return url.trim().replace(/\/+$/, "");
+}
+
+async function supabaseTables(config: SupabaseConfig, secret: { apiKey: string }): Promise<string[]> {
+  const res = await apiFetch(`${normalizeSupabaseUrl(config.url)}/rest/v1/`, { headers: supabaseHeaders(secret) });
+  if (!res.ok) throw new Error(httpError(res, "Supabase REST (PostgREST)"));
+  const spec = (await res.json()) as { definitions?: Record<string, unknown>; paths?: Record<string, unknown> };
+  const names = spec.definitions
+    ? Object.keys(spec.definitions)
+    : Object.keys(spec.paths ?? {}).filter((p) => p !== "/").map((p) => p.replace(/^\//, ""));
+  return names.filter((n) => !n.startsWith("rpc/"));
+}
+
+export async function testSupabase(config: SupabaseConfig, secret: { apiKey: string }): Promise<TestResult> {
+  try {
+    const tables = await supabaseTables(config, secret);
+    if (!tables.length) return { ok: true, message: "Conexão OK, mas nenhuma tabela exposta no schema public (verifique policies/API)." };
+    return { ok: true, message: `Conexão OK — ${tables.length} tabelas visíveis: ${tables.slice(0, 6).join(", ")}${tables.length > 6 ? "…" : ""}.` };
+  } catch (e) {
+    return { ok: false, message: `Falha ao conectar no Supabase: ${(e as Error).message}` };
+  }
+}
+
+const SUPABASE_MAX_TABLES = 20;
+const SUPABASE_MAX_ROWS = 200;
+
+export async function syncSupabase(db: Database.Database, connectionId: number, config: SupabaseConfig, secret: { apiKey: string }): Promise<SyncResult> {
+  const base = normalizeSupabaseUrl(config.url);
+  const tables = (await supabaseTables(config, secret)).slice(0, SUPABASE_MAX_TABLES);
+  const detalhes: string[] = [];
+
+  db.prepare("DELETE FROM raw_records WHERE connection_id = ?").run(connectionId);
+  const ins = db.prepare("INSERT INTO raw_records (connection_id, tabela, dados) VALUES (?, ?, ?)");
+
+  for (const tabela of tables) {
+    try {
+      const res = await apiFetch(`${base}/rest/v1/${encodeURIComponent(tabela)}?select=*&limit=${SUPABASE_MAX_ROWS}`, {
+        headers: supabaseHeaders(secret),
+      });
+      if (!res.ok) {
+        detalhes.push(`${tabela}: sem acesso (HTTP ${res.status})`);
+        continue;
+      }
+      const rows = (await res.json()) as Record<string, unknown>[];
+      const insMany = db.transaction((items: Record<string, unknown>[]) => {
+        for (const r of items) ins.run(connectionId, tabela, JSON.stringify(r));
+      });
+      insMany(rows);
+      detalhes.push(`${tabela}: ${rows.length} linhas`);
+
+      // Layer 1 → catálogo: cada tabela vira um ativo bruto aguardando curadoria semântica
+      const existing = db.prepare("SELECT id FROM data_assets WHERE connection_id = ? AND nome_original = ?").get(connectionId, tabela) as
+        | { id: number }
+        | undefined;
+      if (existing) {
+        db.prepare("UPDATE data_assets SET linhas = ?, status = 'ativo' WHERE id = ?").run(rows.length, existing.id);
+      } else {
+        db.prepare(
+          `INSERT INTO data_assets (workspace_id, connection_id, nome, tipo, area, descricao, sensibilidade_lgpd, campos_sensiveis, linhas, tabela_origem, nome_original)
+           VALUES (1, ?, ?, 'tabela', 'Ingestão', ?, 'baixa', '[]', ?, 'raw_records', ?)`
+        ).run(connectionId, tabela, `Tabela “${tabela}” ingerida do Supabase (dados brutos, aguardando curadoria semântica).`, rows.length, tabela);
+        audit("sistema", "catalog.create", tabela, `Ativo bruto criado pela ingestão Supabase (conexão #${connectionId}).`);
+      }
+    } catch (e) {
+      detalhes.push(`${tabela}: falhou (${(e as Error).message})`);
+    }
+  }
+  return { detalhes };
+}
+
 // ── Registry + upsert de DataAssets ─────────────────────────────────────
 
 export const CONNECTOR_FIELDS: Record<
@@ -256,6 +338,11 @@ export const CONNECTOR_FIELDS: Record<
     ],
     secret: [{ key: "clientSecret", label: "Client Secret" }],
   },
+  supabase: {
+    label: "Supabase (banco de dados)",
+    config: [{ key: "url", label: "URL do projeto", placeholder: "https://xxxx.supabase.co" }],
+    secret: [{ key: "apiKey", label: "API key (service_role para leitura completa)" }],
+  },
 };
 
 /** Garante que os DataAssets da conexão existem no catálogo e atualiza a contagem de linhas. */
@@ -279,12 +366,12 @@ export function upsertAssets(db: Database.Database, connectionId: number, tipo: 
     const { qtd } = db.prepare(`SELECT COUNT(*) qtd FROM ${def.table} WHERE connection_id = ?`).get(connectionId) as { qtd: number };
     const existing = db.prepare("SELECT id FROM data_assets WHERE connection_id = ? AND nome = ?").get(connectionId, def.nome) as { id: number } | undefined;
     if (existing) {
-      db.prepare("UPDATE data_assets SET linhas = ?, status = 'ativo' WHERE id = ?").run(qtd, existing.id);
+      db.prepare("UPDATE data_assets SET linhas = ?, status = 'ativo', tabela_origem = ? WHERE id = ?").run(qtd, def.table, existing.id);
     } else {
       db.prepare(
-        `INSERT INTO data_assets (workspace_id, connection_id, nome, tipo, area, descricao, sensibilidade_lgpd, campos_sensiveis, linhas)
-         VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?)`
-      ).run(connectionId, def.nome, def.tipoAsset, def.area, def.descricao, def.lgpd, JSON.stringify(def.campos), qtd);
+        `INSERT INTO data_assets (workspace_id, connection_id, nome, tipo, area, descricao, sensibilidade_lgpd, campos_sensiveis, linhas, tabela_origem, nome_original)
+         VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      ).run(connectionId, def.nome, def.tipoAsset, def.area, def.descricao, def.lgpd, JSON.stringify(def.campos), qtd, def.table, def.table);
       audit("sistema", "catalog.create", def.nome, `DataAsset criado automaticamente pelo sync da conexão #${connectionId}.`);
     }
   }

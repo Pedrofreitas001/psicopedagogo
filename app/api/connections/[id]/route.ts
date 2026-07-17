@@ -23,6 +23,7 @@ export async function DELETE(_req: Request, ctx: { params: Promise<{ id: string 
     zendesk: ["zendesk_tickets"],
     powerbi: ["powerbi_reports"],
     ads: ["marketing_campaigns"],
+    supabase: ["raw_records"],
   };
   for (const t of sourceTables[conn.tipo] ?? []) db.prepare(`DELETE FROM ${t} WHERE connection_id = ?`).run(conn.id);
   const assets = db.prepare("SELECT id FROM data_assets WHERE connection_id = ?").all(conn.id) as { id: number }[];

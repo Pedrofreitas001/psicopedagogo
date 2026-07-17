@@ -18,7 +18,7 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
   if (!asset) return NextResponse.json({ error: "Ativo não encontrado" }, { status: 404 });
 
   const body = await req.json();
-  const allowed = ["descricao", "area", "sensibilidade_lgpd", "campos_sensiveis", "owner_id", "steward_id"] as const;
+  const allowed = ["nome", "descricao", "area", "sensibilidade_lgpd", "campos_sensiveis", "owner_id", "steward_id"] as const;
   const changes: string[] = [];
   for (const field of allowed) {
     if (body[field] !== undefined) {

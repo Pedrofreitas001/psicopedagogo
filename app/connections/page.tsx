@@ -7,6 +7,7 @@ const TIPO_META: Record<string, { logo: string; cor: string; auth: string }> = {
   zendesk: { logo: "Z", cor: "bg-emerald-700", auth: "OAuth 2.0 ou API token — Tickets API" },
   powerbi: { logo: "P", cor: "bg-amber-500", auth: "Service Principal (Entra ID) — metadados via REST" },
   ads: { logo: "M", cor: "bg-sky-600", auth: "Campanhas de mídia paga (Meta/Google/TikTok/email)" },
+  supabase: { logo: "S", cor: "bg-emerald-600", auth: "API key (PostgREST) — ingestão bruta de todas as tabelas expostas" },
 };
 
 export default function ConnectionsPage() {

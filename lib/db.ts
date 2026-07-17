@@ -39,7 +39,7 @@ function resolveDataDir(): string {
 }
 
 /** Versão do schema. DBs demo antigos são recriados; a partir daqui, migrações preservam dados. */
-const SCHEMA_VERSION = 2;
+const SCHEMA_VERSION = 3;
 
 export function getDb(): Database.Database {
   if (_db) return _db;
@@ -95,6 +95,8 @@ function migrate(db: Database.Database) {
     campos_sensiveis TEXT NOT NULL DEFAULT '[]',
     status TEXT NOT NULL DEFAULT 'ativo',
     linhas INTEGER NOT NULL DEFAULT 0,
+    tabela_origem TEXT NOT NULL DEFAULT '',
+    nome_original TEXT NOT NULL DEFAULT '',
     criado_em TEXT NOT NULL DEFAULT (datetime('now'))
   );
   CREATE TABLE IF NOT EXISTS asset_relationships (
@@ -160,6 +162,13 @@ function migrate(db: Database.Database) {
     id INTEGER PRIMARY KEY, connection_id INTEGER NOT NULL,
     nome TEXT NOT NULL, dataset TEXT NOT NULL, descricao TEXT NOT NULL, atualizado_em TEXT NOT NULL
   );
+  -- Layer 1 (Ingestão): registros brutos de conectores genéricos (Supabase, planilhas...)
+  CREATE TABLE IF NOT EXISTS raw_records (
+    id INTEGER PRIMARY KEY, connection_id INTEGER NOT NULL,
+    tabela TEXT NOT NULL, dados TEXT NOT NULL,
+    criado_em TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+  CREATE INDEX IF NOT EXISTS idx_raw_conn_tabela ON raw_records (connection_id, tabela);
   CREATE TABLE IF NOT EXISTS marketing_campaigns (
     id INTEGER PRIMARY KEY, connection_id INTEGER NOT NULL,
     nome TEXT NOT NULL, canal TEXT NOT NULL, objetivo TEXT NOT NULL,
@@ -314,14 +323,14 @@ function seed(db: Database.Database) {
 
   // ── Data Catalog (o que o sync() dos conectores popula) ────────────────
   const insAsset = db.prepare(
-    `INSERT INTO data_assets (id, workspace_id, connection_id, nome, tipo, owner_id, steward_id, area, descricao, sensibilidade_lgpd, campos_sensiveis, linhas)
-     VALUES (?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    `INSERT INTO data_assets (id, workspace_id, connection_id, nome, tipo, owner_id, steward_id, area, descricao, sensibilidade_lgpd, campos_sensiveis, linhas, tabela_origem, nome_original)
+     VALUES (?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   );
-  insAsset.run(1, 1, "Pedidos", "tabela", 1, 2, "Vendas", "Pedidos da loja VTEX (Orders API): cliente, itens, total, status e data.", "alta", JSON.stringify(["cliente_email", "cliente_cpf"]), 95);
-  insAsset.run(2, 1, "Produtos", "tabela", 1, 2, "Vendas", "Catálogo de produtos da VTEX (Catalog API): nome, categoria e preço.", "baixa", "[]", 10);
-  insAsset.run(3, 2, "Tickets", "tabela", 1, 2, "Atendimento", "Tickets do Zendesk (Tickets API): assunto, categoria, status, prioridade, CSAT e solicitante.", "media", JSON.stringify(["requester_email"]), 60);
-  insAsset.run(4, 3, "Relatórios Power BI", "dataset", 1, 2, "Analytics", "Metadados de relatórios e datasets do workspace Power BI (REST API, leitura).", "baixa", "[]", 6);
-  insAsset.run(5, 4, "Campanhas de Mídia", "tabela", 1, 2, "Marketing", "Campanhas de mídia paga (Meta, Google, TikTok, email): investimento, cliques, conversões e receita atribuída.", "baixa", "[]", 8);
+  insAsset.run(1, 1, "Pedidos", "tabela", 1, 2, "Vendas", "Pedidos da loja VTEX (Orders API): cliente, itens, total, status e data.", "alta", JSON.stringify(["cliente_email", "cliente_cpf"]), 95, "vtex_orders", "orders");
+  insAsset.run(2, 1, "Produtos", "tabela", 1, 2, "Vendas", "Catálogo de produtos da VTEX (Catalog API): nome, categoria e preço.", "baixa", "[]", 10, "vtex_products", "products");
+  insAsset.run(3, 2, "Tickets", "tabela", 1, 2, "Atendimento", "Tickets do Zendesk (Tickets API): assunto, categoria, status, prioridade, CSAT e solicitante.", "media", JSON.stringify(["requester_email"]), 60, "zendesk_tickets", "tickets");
+  insAsset.run(4, 3, "Relatórios Power BI", "dataset", 1, 2, "Analytics", "Metadados de relatórios e datasets do workspace Power BI (REST API, leitura).", "baixa", "[]", 6, "powerbi_reports", "reports");
+  insAsset.run(5, 4, "Campanhas de Mídia", "tabela", 1, 2, "Marketing", "Campanhas de mídia paga (Meta, Google, TikTok, email): investimento, cliques, conversões e receita atribuída.", "baixa", "[]", 8, "marketing_campaigns", "campaigns");
 
   const insRel = db.prepare("INSERT INTO asset_relationships (asset_origem_id, asset_destino_id, tipo) VALUES (?, ?, ?)");
   insRel.run(1, 2, "referencia (produto_id)");
