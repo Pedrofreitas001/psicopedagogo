@@ -14,7 +14,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     nome: string;
     papel: string;
   }[];
-  const workspace = db.prepare("SELECT nome, plano FROM workspaces WHERE id = 1").get() as { nome: string; plano: string };
+  const workspace = db.prepare("SELECT nome FROM workspaces WHERE id = 1").get() as { nome: string };
 
   return (
     <div className="flex min-h-screen">
@@ -23,10 +23,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         currentUserId={current.id}
         currentUserPapel={current.papel}
         workspaceName={workspace.nome}
-        plano={workspace.plano}
         authMode={authEnabled()}
       />
-      <main className="flex-1 min-w-0 px-8 py-8 max-w-[1200px]">{children}</main>
+      <main className="flex-1 min-w-0 px-8 py-8 max-w-[1100px]">{children}</main>
     </div>
   );
 }

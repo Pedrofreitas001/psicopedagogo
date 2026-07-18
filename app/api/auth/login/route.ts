@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import { audit } from "@/lib/db";
 import { authEnabled, signIn, serializeSession, SESSION_COOKIE } from "@/lib/supabase-auth";
 
 export async function POST(req: Request) {
@@ -10,7 +9,6 @@ export async function POST(req: Request) {
   const result = await signIn(email.trim(), password);
   if (!result.session) return NextResponse.json({ error: result.error }, { status: 401 });
 
-  audit(result.user?.nome ?? email, "auth.login", email, "Login via Supabase Auth.");
   const res = NextResponse.json({ ok: true });
   res.cookies.set(SESSION_COOKIE, serializeSession(result.session), { httpOnly: true, sameSite: "lax", secure: true, path: "/" });
   return res;

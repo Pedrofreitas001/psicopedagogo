@@ -1,19 +1,24 @@
 @import "tailwindcss";
 
 :root {
-  --surface-1: #fcfcfb;
-  --page: #f7f7f5;
-  --ink-1: #0b0b0b;
-  --ink-2: #52514e;
-  --ink-muted: #898781;
-  --grid: #e1e0d9;
-  --axis: #c3c2b7;
-  --series-1: #2a78d6;
-  --brand: #4a3aa7;
+  --page: #faf6ef;
+  --surface-1: #fffdf9;
+  --ink-1: #2b2521;
+  --ink-2: #5c5148;
+  --ink-muted: #97897c;
+  --grid: #e9e2d6;
+  --brand: #a85b38;
+  --brand-deep: #8c4a2c;
+  --leaf: #5c7a5e;
 }
 
 body {
   background: var(--page);
   color: var(--ink-1);
-  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  font-family: "Avenir Next", "Segoe UI", system-ui, -apple-system, sans-serif;
+}
+
+h1, h2, h3 {
+  font-family: Georgia, "Times New Roman", serif;
+  letter-spacing: -0.01em;
 }

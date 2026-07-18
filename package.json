@@ -1,8 +1,8 @@
 {
-  "name": "governance-hub",
+  "name": "psicopedagogo",
   "version": "0.1.0",
   "private": true,
-  "description": "HUB de Governança de Dados & Agentes de IA — MVP",
+  "description": "Plataforma de acompanhamento psicopedagógico — MVP (biblioteca, clientes, assistente de estudos)",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
@@ -10,6 +10,7 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.71.0",
     "better-sqlite3": "^11.10.0",
     "next": "^15.3.4",
     "react": "^19.1.0",

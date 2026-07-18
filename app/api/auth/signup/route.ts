@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import { audit } from "@/lib/db";
 import { authEnabled, signUp, serializeSession, SESSION_COOKIE } from "@/lib/supabase-auth";
 
 export async function POST(req: Request) {
@@ -13,7 +12,6 @@ export async function POST(req: Request) {
   const result = await signUp(email.trim(), password, nome.trim());
   if (result.error) return NextResponse.json({ error: result.error }, { status: 400 });
 
-  audit(nome.trim(), "auth.signup", email, result.pendingConfirmation ? "Conta criada; aguardando confirmação por email." : "Conta criada.");
   if (result.pendingConfirmation) {
     return NextResponse.json({ pendingConfirmation: true, message: "Conta criada! Confirme pelo link enviado ao seu email e depois faça login." });
   }

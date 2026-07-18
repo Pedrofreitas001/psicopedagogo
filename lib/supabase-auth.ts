@@ -10,7 +10,7 @@
  * Modo DEMO: sem as env vars, cai no seletor de usuário local (dev).
  */
 
-export const SESSION_COOKIE = "gh_session";
+export const SESSION_COOKIE = "ea_session";
 
 export function supabaseUrl(): string | null {
   const url = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;

@@ -1,9 +1,34 @@
-# Governance Hub — Dados & Agentes de IA (MVP)
+# Espaço Aprender — Acompanhamento Psicopedagógico (MVP)
 
-Plataforma operacional de dados e IA para empresas de médio porte: conecta ferramentas SaaS
-(VTEX, Zendesk, Power BI), organiza os dados numa camada de governança e permite que **agentes
-de IA com escopo controlado** respondam perguntas em linguagem natural, citando a fonte e
-gerando visualizações.
+Plataforma web para uma psicopedagoga acompanhar a jornada de seus clientes. A tecnologia
+atua como **suporte à metodologia da especialista** — não como um produto de IA. A interface
+é acolhedora e enxuta: quatro módulos, sem dezenas de menus.
+
+## Os quatro módulos
+
+1. **Autenticação** (Supabase Auth) — dois perfis: **Mentora** e **Cliente**.
+2. **Biblioteca** — a mentora sobe PDF, Word, PowerPoint e Excel e organiza por pastas
+   (ex.: Leitura → Dislexia → Protocolos / Materiais / Exercícios). O resumo de conteúdo
+   informado no upload vira a base de conhecimento do assistente.
+3. **Clientes** — cada cliente tem: nome, objetivo, observações, arquivos, histórico e chat.
+   Dados isolados por usuário (RLS no Supabase; ver `supabase/schema.sql`).
+4. **Assistente de Estudos** — chat simples ("Olá! Como posso ajudar?") que responde usando
+   **exclusivamente**: documentos da mentora + metodologia cadastrada + histórico daquele
+   cliente. Nunca internet, nunca opinião própria, nunca diagnóstico. Sem evidência na base,
+   ele diz claramente que não pode responder. Toda conversa é salva automaticamente.
+
+**Funcionalidade "uau"**: na página do cliente, o botão **"Gerar resumo da evolução"** lê
+todas as conversas e a linha do tempo e produz uma síntese profissional para a mentora.
+
+## O que cada perfil vê
+
+| Cliente | Mentora |
+|---|---|
+| Olá, {nome} — Bem-vindo ao seu acompanhamento | Clientes |
+| 📚 Materiais | Biblioteca |
+| 💬 Assistente | Assistente |
+| 📝 Meu Histórico | Configurações (metodologia) |
+| 📂 Documentos | |
 
 ## Rodando
 
@@ -12,138 +37,59 @@ npm install
 npm run dev        # http://localhost:3000
 ```
 
-### Autenticação (Supabase Auth)
+Sem nenhuma env var o app roda em **modo demo**: SQLite semeado com dados de exemplo
+(mentora Mariana, clientes Pedro e Luísa, biblioteca e histórico), seletor de usuário na
+sidebar e assistente 100% offline (compõe respostas dos trechos recuperados da base).
 
-Com `SUPABASE_URL` + `SUPABASE_ANON_KEY` definidos (env vars da Vercel ou `.env.local`),
-a plataforma inteira passa a exigir **login real**: páginas redirecionam para `/login`,
-APIs respondem 401, sessão em cookie httpOnly com renovação automática de token.
-Provisionamento no primeiro acesso: email igual a um usuário semeado herda o papel
-(ex.: pedrofreitas@usp.br → admin); primeiro login real do workspace vira admin; demais
-entram como viewer. Sem as env vars, cai no modo demo (seletor de usuário na sidebar).
+### Env vars (produção)
 
-Importante no projeto Supabase: em **Authentication → URL Configuration**, defina o
-Site URL como a URL do app (ex.: `https://governance-hub-mvp.vercel.app`) para o link de
-confirmação de email apontar para o lugar certo.
-
-### Deploy na Vercel
-
-Funciona sem configuração: em ambiente serverless o filesystem é somente leitura, então o
-SQLite é criado em `/tmp` e **ressemeado a cada cold start** — os dados demo sempre aparecem,
-mas dashboards/edições salvos são efêmeros. Para persistência real em produção, migrar para
-Postgres (o schema já está pronto para isso, ver "Decisões do MVP").
-
-Na primeira execução o banco SQLite (`data/hub.db`) é criado e populado com dados demo dos
-três conectores (95 pedidos VTEX, 60 tickets Zendesk, 6 relatórios Power BI), 3 agentes
-configurados e 1 workspace com 3 usuários (admin / steward / viewer — troque pelo seletor na
-sidebar para ver o RBAC em ação). Para resetar o demo, apague `data/hub.db`.
-
-## O que demonstrar (roteiro de 5 minutos)
-
-1. **Assistente** → clique na sugestão *"Quais os tickets de suporte mais frequentes de
-   clientes que compraram acima de R$500 no último mês?"* — o Orchestrator aciona o agente
-   cross, cruza Pedidos (VTEX) × Tickets (Zendesk) por email, responde com KPIs + gráfico +
-   tabela, cita as fontes e mascara PII (LGPD). Clique em **Salvar como dashboard**.
-2. **Assistente** → fixe o roteamento em *"Agente de Suporte"* e pergunte sobre faturamento —
-   o agente **recusa** (não tem a skill `vtex.pedidos`): governança por escopo, não por prompt.
-3. **Agentes** → abra um agente e ajuste as skills (ferramentas MCP), ativos autorizados e a
-   política de PII. Crie um agente novo em segundos.
-4. **Data Catalog** → abra "Pedidos": owner, steward, sensibilidade LGPD, campos sensíveis,
-   relacionamentos e quais agentes têm acesso. Troque para o usuário *viewer* e tente salvar —
-   bloqueado (RBAC).
-5. **Conexões** → "ver credencial": o valor sai mascarado e a leitura aparece na **Auditoria**.
-6. **Dashboards** → o dashboard salvo no passo 1 reaparece idêntico (spec JSON renderizada
-   pelo Dynamic UI Engine).
-
-## Visão: Plataforma de Inteligência Empresarial
-
-O produto evolui de "hub de agentes" para **Sistema Operacional de Inteligência
-Empresarial** em 4 camadas — e o código já está organizado nessa direção:
-
-| Camada da visão | O que já existe hoje | Próximo passo |
-|---|---|---|
-| **1. Ingestão** (dados brutos, nada é alterado) | Conectores VTEX/Zendesk/Power BI/Supabase; tabela `raw_records` guarda registros brutos de fontes genéricas | Upload de Excel/CSV |
-| **2. Modelo Semântico** (tabelas viram entidades de negócio) | Data Catalog com nome semântico editável (ex.: `tbl_orders` → "Pedidos"), descrição, área, relacionamentos entre entidades | Semantic Builder conversacional (IA entrevista o usuário) |
-| **3. Modelo Analítico** (métricas e KPIs) | KPIs calculados nos módulos (ROAS, CAC, CSAT, faturamento); Biblioteca de Queries | Definição de métricas pelo usuário, validadas pela IA |
-| **4. Experiência** (consumidores do conhecimento) | Assistente, agentes com escopo, dashboards salvos, insights automáticos de marketing | Brains por domínio nascendo das análises recorrentes |
-
-Princípio central: **agentes, dashboards e automações são consumidores do modelo
-de conhecimento** — não o produto em si.
-
-## Conexões reais
-
-Além do modo demo, a aba **Conexões → Nova conexão real** aceita credenciais de contas
-reais e puxa dados direto das APIs:
-
-- **VTEX**: account name + AppKey/AppToken → Orders API (100 pedidos mais recentes) e
-  busca pública do catálogo (50 produtos).
-- **Zendesk**: subdomínio + OAuth bearer token (ou email + API token legado) →
-  Tickets API com sideload de usuários (100 tickets mais recentes).
-- **Power BI**: tenant ID + client ID + client secret + workspace ID (service principal) →
-  metadados de relatórios e datasets.
-
-O fluxo: as credenciais são testadas contra a API real antes de salvar → o segredo vai
-criptografado para o Vault → `sync()` grava os dados nas tabelas de origem e cria os
-DataAssets no catálogo → os agentes passam a responder sobre os dados reais. Erros de
-credencial retornam mensagens amigáveis (401/403/404/429) e tudo é auditado.
-
-## Marketing
-
-A aba **Marketing** traz: KPIs de mídia (investimento, receita atribuída, ROAS, CAC),
-ROAS por canal, insights automáticos (melhor canal, campanhas com ROAS < 1 candidatas a
-pausa, criativo fatigado por CTR baixo) e o **Estúdio de criativos** — gera variações de
-copy por canal/objetivo/tom usando preço e categoria reais do catálogo. O Agente de
-Marketing responde no chat: "qual o ROAS por canal?", "gere um criativo para X".
-
-## Agentes com personalidade completa
-
-Cada agente define: identidade (nome, modelo, objetivo, prompt base), personalidade
-(tom de voz, idioma, público-alvo), escopo de trabalho (o que faz / o que NÃO faz),
-diretrizes e restrições invioláveis, skills MCP e ativos autorizados, política de PII.
-O editor mostra o **prompt composto** final — exatamente o que o Agent Runtime envia ao
-modelo quando o Claude Agent SDK for plugado.
-
-## Arquitetura (mapeada ao PRD)
-
-| Camada do PRD | Onde está no código |
+| Variável | Efeito |
 |---|---|
-| 1. Core Platform (workspace, RBAC, auditoria) | `lib/db.ts`, `lib/auth.ts`, `app/audit/` |
-| 2. Credential Vault (AES-256-GCM, leitura auditada) | `lib/vault.ts`, `app/api/credentials/` |
-| 3. Connection Hub (VTEX, Zendesk, Power BI) | `app/connections/`, `app/api/connections/[id]/sync/` |
-| 4. Data Catalog (owner, steward, LGPD, relacionamentos) | `app/catalog/`, `app/api/catalog/` |
-| 5. Biblioteca de Queries (+ explicar com IA) | `app/queries/`, `app/api/queries/[id]/explain/` |
-| 7. Agent Runtime (skills, escopo, custo, recusa) | `lib/engine.ts`, `app/agents/` |
-| 8. Orchestrator + Projects (roteamento, encadeamento) | `lib/engine.ts` (`pickAgents`/`executeQuestion`) |
-| 9. Dynamic UI Engine (kpi/table/chart/kanban) + Dashboards | `lib/types.ts`, `components/SpecRenderer.tsx`, `app/dashboards/` |
+| `SUPABASE_URL` + `SUPABASE_ANON_KEY` | Liga o login real (Supabase Auth): páginas exigem sessão, cookie httpOnly, renovação de token no middleware. |
+| `SUPABASE_SERVICE_ROLE_KEY` | Uploads vão para o bucket privado `documentos` do Supabase Storage; download por URL assinada. |
+| `ANTHROPIC_API_KEY` | A redação das respostas do assistente e o resumo de evolução passam a ser feitos pelo Claude (`claude-opus-4-8`), sempre presos à base recuperada. |
 
-## Decisões do MVP e caminho de produção
+Provisionamento no primeiro login: email igual a um usuário semeado herda o papel; email
+igual ao de um **cliente cadastrado pela mentora** entra como cliente já vinculado ao seu
+registro; primeiro login real do workspace vira **mentora**; demais viram clientes.
 
-O objetivo deste MVP é **demonstrar valor sem infraestrutura externa** — ele roda com
-`npm run dev` e nada mais. As simplificações são deliberadas e cada uma tem um caminho de
-migração direto:
+## Como o assistente se mantém fundamentado
 
-- **SQLite em vez de PostgreSQL**: o schema já espelha a seção 3 do PRD (tudo com
-  `workspace_id`); migrar é trocar o driver e ativar Row-Level Security.
-- **Conectores em modo demo**: implementam o mesmo contrato (`sync` popula DataAssets,
-  credenciais no Vault, auditoria). Plugar as APIs reais (VTEX AppKey/AppToken, Zendesk
-  OAuth 2.0, Power BI service principal com fila para o rate limit) troca a origem dos dados,
-  não a arquitetura. Cada conector vira um **servidor MCP** para que agentes internos e
-  clientes externos (Claude Desktop/Cowork) usem a mesma interface.
-- **Planner determinístico em vez de LLM**: `lib/engine.ts` interpreta a pergunta por regras
-  e executa "ferramentas" locais. Em produção, cada ferramenta vira um tool MCP e o
-  **Claude Agent SDK** assume o planejamento — o contrato de resposta (`ChatResponse` com
-  blocos de UI, fontes, custo e flag de mascaramento) permanece o mesmo, então o frontend
-  não muda.
-- **Auth por cookie + seletor de usuário**: substituir por Auth.js/Clerk multi-tenant.
-- **Sem Knowledge Hub (Módulo 6)**: fica para a fase 2 do roadmap (pgvector + chunking),
-  como previsto no PRD.
+1. **Recuperação**: a pergunta é tokenizada (sem acentos/stopwords) e pontuada contra a
+   metodologia, os documentos com conteúdo e o histórico do cliente (`lib/assistente.ts`).
+2. **Piso de evidência**: sem trecho relevante, resposta de recusa transparente — sem
+   inventar.
+3. **Redação**: com `ANTHROPIC_API_KEY`, o Claude redige a partir apenas dos trechos
+   recuperados, com prompt que proíbe diagnóstico e conhecimento externo; sem a chave, a
+   resposta é composta diretamente dos trechos (offline). Em ambos os casos as **fontes são
+   exibidas** na conversa.
+4. **Registro**: toda troca vira `conversations`/`messages` e alimenta a linha do tempo
+   (`events`) — que é o "Meu Histórico" do cliente e o insumo do resumo de evolução.
 
-## Governança implementada
+## Estrutura do banco
 
-- Agentes só executam **skills explicitamente autorizadas**; fora do escopo → recusa auditada.
-- PII (email/CPF) **mascarado por padrão** nas respostas; exibição em claro é permissão por
-  agente, marcada na UI.
-- RBAC: viewer não edita catálogo/agentes; só admin exclui agentes; credenciais são
-  inacessíveis ao viewer.
-- Vault: segredos com AES-256-GCM, nunca retornados em claro pela API, toda leitura auditada.
-- AuditLog cobre: sync de conectores, acesso a credenciais, execução/recusa de agentes,
-  mudanças de governança e ownership, dashboards salvos.
+`workspaces · users · clients · categories · documents · knowledge · conversations · messages · events`
+
+O SQLite do MVP (`lib/db.ts`) espelha o Postgres de produção (`supabase/schema.sql`), que já
+traz as **políticas de RLS**: mentora enxerga o workspace inteiro; cliente enxerga só o
+próprio registro, seus documentos, suas conversas e a biblioteca compartilhada.
+
+## Estrutura do código
+
+```
+lib/            lógica de domínio
+  db.ts           schema + seed (SQLite demo, espelho do Supabase)
+  auth.ts         usuário atual + provisionamento por papel
+  supabase-auth.ts  Supabase Auth via REST (login, refresh, validação)
+  storage.ts      Supabase Storage com fallback em disco
+  assistente.ts   recuperação na base + Claude + resumo de evolução
+app/api/        rotas finas: validam, aplicam permissão, chamam lib/
+app/(app)/      páginas por papel (dashboard, materiais, biblioteca, clientes…)
+components/     UI reutilizável (chat, upload, formulários, linha do tempo)
+supabase/       schema Postgres + RLS de produção
+```
+
+Decisões do MVP: SQLite para rodar sem infraestrutura (migração 1:1 para o Postgres do
+Supabase), extração de texto dos uploads via campo "resumo de conteúdo" (extração automática
+de PDF/Word fica para a fase 2), e assistente com fallback offline para a demo nunca depender
+de chave de API.

@@ -1,87 +1,61 @@
 import Link from "next/link";
 import { getDb } from "@/lib/db";
+import { getCurrentUser } from "@/lib/auth";
 
-const ACAO_LABEL: Record<string, string> = {
-  "connector.sync": "🔄 Sincronização",
-  "agent.execucao": "🤖 Execução de agente",
-  "agent.recusa": "🚫 Recusa por escopo",
-  "agent.create": "🤖 Agente criado",
-  "agent.update": "🤖 Agente atualizado",
-  "catalog.update": "📚 Catálogo editado",
-  "catalog.ownership": "👤 Ownership alterado",
-  "vault.read": "🔐 Acesso a credencial",
-  "dashboard.create": "📊 Dashboard salvo",
-  "query.explain": "✨ Query explicada",
-};
+function Card({ href, emoji, titulo, descricao }: { href: string; emoji: string; titulo: string; descricao: string }) {
+  return (
+    <Link
+      href={href}
+      className="rounded-2xl border border-black/8 bg-[var(--surface-1)] p-6 shadow-sm hover:shadow-md hover:border-[var(--brand)]/30 transition-all block"
+    >
+      <div className="text-2xl">{emoji}</div>
+      <div className="mt-3 font-semibold text-[15px]">{titulo}</div>
+      <div className="mt-1 text-[13px] text-[var(--ink-2)] leading-relaxed">{descricao}</div>
+    </Link>
+  );
+}
 
-export default function Home() {
+export default async function Home() {
+  const user = (await getCurrentUser())!;
   const db = getDb();
-  const stats = {
-    conexoes: (db.prepare("SELECT COUNT(*) c FROM connections WHERE workspace_id=1 AND status='conectado'").get() as { c: number }).c,
-    ativos: (db.prepare("SELECT COUNT(*) c FROM data_assets WHERE workspace_id=1").get() as { c: number }).c,
-    agentes: (db.prepare("SELECT COUNT(*) c FROM agents WHERE workspace_id=1").get() as { c: number }).c,
-    execucoes: (db.prepare("SELECT COALESCE(SUM(execucoes),0) c FROM agents WHERE workspace_id=1").get() as { c: number }).c,
-    custo: (db.prepare("SELECT COALESCE(SUM(custo_acumulado),0) c FROM agents WHERE workspace_id=1").get() as { c: number }).c,
-    sensiveis: (db.prepare("SELECT COUNT(*) c FROM data_assets WHERE workspace_id=1 AND sensibilidade_lgpd='alta'").get() as { c: number }).c,
-  };
-  const atividade = db.prepare("SELECT ator, acao, alvo, detalhe, timestamp FROM audit_logs WHERE workspace_id=1 ORDER BY timestamp DESC, id DESC LIMIT 8").all() as {
-    ator: string; acao: string; alvo: string; detalhe: string; timestamp: string;
-  }[];
 
-  const cards = [
-    { label: "Conexões ativas", value: stats.conexoes, href: "/connections", hint: "VTEX · Zendesk · Power BI · Mídia" },
-    { label: "Ativos governados", value: stats.ativos, href: "/catalog", hint: `${stats.sensiveis} com sensibilidade LGPD alta` },
-    { label: "Agentes de IA", value: stats.agentes, href: "/agents", hint: `${stats.execucoes} execuções acumuladas` },
-    { label: "Custo de IA acumulado", value: `US$ ${stats.custo.toFixed(2)}`, href: "/agents", hint: "soma de todos os agentes" },
-  ];
+  if (user.papel === "cliente") {
+    const primeiroNome = user.nome.split(" ")[0];
+    return (
+      <div className="max-w-3xl">
+        <h1 className="text-3xl font-semibold">Olá, {primeiroNome}</h1>
+        <p className="mt-2 text-[15px] text-[var(--ink-2)]">Bem-vindo ao seu acompanhamento.</p>
+        <div className="mt-2 h-px bg-[var(--grid)]" />
+        <div className="mt-8 grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <Card href="/materiais" emoji="📚" titulo="Materiais" descricao="Os conteúdos que sua mentora preparou para a sua jornada." />
+          <Card href="/assistente" emoji="💬" titulo="Assistente" descricao="Tire dúvidas a qualquer hora, com base no seu acompanhamento." />
+          <Card href="/historico" emoji="📝" titulo="Meu Histórico" descricao="A linha do tempo do que vocês já construíram juntos." />
+          <Card href="/documentos" emoji="📂" titulo="Documentos" descricao="Seus arquivos e atividades, num lugar só." />
+        </div>
+      </div>
+    );
+  }
+
+  const stats = {
+    clientes: (db.prepare("SELECT COUNT(*) c FROM clients WHERE workspace_id = 1").get() as { c: number }).c,
+    documentos: (db.prepare("SELECT COUNT(*) c FROM documents WHERE workspace_id = 1 AND categoria_id IS NOT NULL").get() as { c: number }).c,
+    conversas: (db.prepare("SELECT COUNT(*) c FROM conversations WHERE workspace_id = 1").get() as { c: number }).c,
+  };
+  const primeiroNome = user.nome.split(" ")[0];
 
   return (
-    <div className="space-y-8">
-      <header>
-        <h1 className="text-2xl font-semibold">Visão geral</h1>
-        <p className="text-sm text-[var(--ink-2)] mt-1">
-          Uma camada central que organiza os dados das suas ferramentas SaaS e permite que agentes de IA os usem com confiança.
-        </p>
-      </header>
-
-      <div className="grid grid-cols-4 gap-4">
-        {cards.map((c) => (
-          <Link key={c.label} href={c.href} className="rounded-xl border border-black/10 bg-white p-4 hover:border-[var(--brand)]/40 transition-colors">
-            <div className="text-xs text-[var(--ink-muted)]">{c.label}</div>
-            <div className="text-2xl font-semibold mt-1">{c.value}</div>
-            <div className="text-[11.5px] text-[var(--ink-muted)] mt-1">{c.hint}</div>
-          </Link>
-        ))}
+    <div className="max-w-3xl">
+      <h1 className="text-3xl font-semibold">Olá, {primeiroNome}</h1>
+      <p className="mt-2 text-[15px] text-[var(--ink-2)]">
+        {stats.clientes} cliente(s) em acompanhamento · {stats.documentos} materiais na biblioteca · {stats.conversas} conversas registradas
+      </p>
+      <div className="mt-2 h-px bg-[var(--grid)]" />
+      <div className="mt-8 grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <Card href="/clientes" emoji="🤝" titulo="Clientes" descricao="A jornada de cada cliente: objetivo, observações, arquivos e histórico." />
+        <Card href="/biblioteca" emoji="📚" titulo="Biblioteca" descricao="Seus materiais organizados por pastas — a alma do sistema." />
+        <Card href="/assistente" emoji="💬" titulo="Assistente" descricao="Converse com a base de conhecimento no contexto de um cliente." />
+        <Card href="/configuracoes" emoji="⚙️" titulo="Configurações" descricao="Sua metodologia — o que fundamenta as respostas do assistente." />
       </div>
-
-      <div className="rounded-xl border border-[var(--brand)]/25 bg-[var(--brand)]/4 p-5">
-        <h2 className="font-medium text-[15px]">Pergunte aos seus dados</h2>
-        <p className="text-sm text-[var(--ink-2)] mt-1 mb-3">
-          O Orchestrator escolhe o agente certo, cruza VTEX × Zendesk × Power BI, responde citando a fonte e gera a visualização.
-        </p>
-        <Link href="/assistant" className="inline-block rounded-lg bg-[var(--brand)] text-white px-4 py-2 text-sm font-medium">
-          Abrir assistente →
-        </Link>
-      </div>
-
-      <section>
-        <h2 className="font-medium text-[15px] mb-3">Atividade recente (auditoria)</h2>
-        <div className="rounded-xl border border-black/10 bg-white divide-y divide-black/5">
-          {atividade.map((a, i) => (
-            <div key={i} className="px-4 py-2.5 flex items-baseline gap-3 text-[13px]">
-              <span className="shrink-0 w-44 text-[var(--ink-2)]">{ACAO_LABEL[a.acao] ?? a.acao}</span>
-              <span className="flex-1 min-w-0">
-                <span className="font-medium">{a.alvo}</span>
-                {a.detalhe && <span className="text-[var(--ink-muted)]"> — {a.detalhe}</span>}
-              </span>
-              <span className="shrink-0 text-[11.5px] text-[var(--ink-muted)]">{a.ator} · {a.timestamp.slice(5, 16)}</span>
-            </div>
-          ))}
-        </div>
-        <Link href="/audit" className="inline-block mt-2 text-[13px] text-[var(--brand)] hover:underline">
-          Ver auditoria completa →
-        </Link>
-      </section>
     </div>
   );
 }

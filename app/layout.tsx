@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Governance Hub — Dados & Agentes de IA",
-  description: "HUB de governança de dados e agentes de IA (MVP)",
+  title: "Espaço Aprender — Acompanhamento Psicopedagógico",
+  description: "Plataforma de acompanhamento psicopedagógico: biblioteca, jornada do cliente e assistente de estudos.",
 };
 
 export const dynamic = "force-dynamic";
