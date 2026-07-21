@@ -78,7 +78,12 @@ export async function recuperarBase(pergunta: string, clientId: number | null, s
     if (cli && (cli.objetivo || cli.observacoes || cli.diagnosticoPreliminar || cli.queixaPrincipal)) {
       candidatos.push({
         fonte: { tipo: "historico", titulo: `Acompanhamento de ${cli.nome}` },
-        texto: `Objetivo do acompanhamento: ${cli.objetivo}. Observações da mentora: ${cli.observacoes}. Queixa principal: ${cli.queixaPrincipal}. Diagnóstico preliminar: ${cli.diagnosticoPreliminar}.`,
+        texto: juntarComPonto([
+          cli.objetivo && `Objetivo do acompanhamento: ${cli.objetivo}`,
+          cli.queixaPrincipal && `Queixa principal registrada: ${cli.queixaPrincipal}`,
+          cli.diagnosticoPreliminar && `Diagnóstico preliminar já anotado pela mentora: ${cli.diagnosticoPreliminar}`,
+          cli.observacoes && `Observações da mentora: ${cli.observacoes}`,
+        ]),
       });
     }
     const eventos = await listClientEvents(clientId, 12);
@@ -134,19 +139,22 @@ export async function responder(pergunta: string, clientId: number | null, nomeC
     try {
       const resposta = await redigirComIA(pergunta, trechos, clientId, nomeCliente, settings);
       return { resposta, fontes, recusado: false };
-    } catch {
-      // Falha de API não pode derrubar o atendimento: cai no modo offline
+    } catch (e) {
+      // Falha de API não pode derrubar o atendimento: cai no modo offline.
+      // Fica registrado nos logs da função (Vercel → projeto → Logs) para diagnóstico.
+      console.error("[assistente] Falha ao chamar a OpenRouter, caindo para o modo offline:", e);
     }
   }
 
-  // Modo offline: compõe a resposta diretamente dos trechos recuperados
+  // Modo offline (sem IA): não há redação real, só uma composição literal dos
+  // trechos recuperados — muito mais limitada que o modo com OpenRouter.
   const corpo = trechos
     .slice(0, 2)
     .map((t) => resumirTrecho(t.texto))
     .join("\n\n");
   const nomes = fontes.map((f) => `“${f.titulo}”`).join(", ");
   return {
-    resposta: `Com base no que a mentora preparou (${nomes}):\n\n${corpo}\n\nSe quiser, posso detalhar algum desses pontos — e qualquer dúvida clínica fica para a mentora.`,
+    resposta: `[Modo offline — sem IA ativa] Com base no que a mentora preparou (${nomes}):\n\n${corpo}\n\nSe quiser, posso detalhar algum desses pontos — e qualquer dúvida clínica fica para a mentora.`,
     fontes,
     recusado: false,
   };
@@ -155,6 +163,15 @@ export async function responder(pergunta: string, clientId: number | null, nomeC
 function resumirTrecho(texto: string): string {
   const frases = texto.split(/(?<=[.!?])\s+/).slice(0, 4);
   return frases.join(" ").slice(0, 600);
+}
+
+/** Junta partes de texto com ". " entre elas, sem duplicar pontuação quando uma parte já termina em ponto. */
+function juntarComPonto(partes: (string | null | undefined)[]): string {
+  return partes
+    .map((p) => (p ?? "").trim())
+    .filter(Boolean)
+    .map((p) => p.replace(/[.!?]+$/, ""))
+    .join(". ") + ".";
 }
 
 const TOM_INSTRUCAO: Record<AgentSettings["tom"], string> = {
@@ -167,7 +184,7 @@ const TOM_INSTRUCAO: Record<AgentSettings["tom"], string> = {
 async function chamarOpenRouter(system: string, messages: { role: "user" | "assistant"; content: string }[], maxTokens: number): Promise<string> {
   const apiKey = process.env.OPENROUTER_API_KEY;
   if (!apiKey) throw new Error("OPENROUTER_API_KEY não configurada");
-  const model = process.env.OPENROUTER_MODEL || "anthropic/claude-sonnet-4.5";
+  const model = process.env.OPENROUTER_MODEL || "anthropic/claude-sonnet-5";
 
   const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
     method: "POST",
@@ -194,22 +211,42 @@ async function chamarOpenRouter(system: string, messages: { role: "user" | "assi
   return texto;
 }
 
+/** Chamada mínima para diagnosticar a configuração da OpenRouter (usada pelo botão "Testar conexão" em Configurações). */
+export async function testarConexaoIA(): Promise<{ ok: boolean; modelo?: string; resposta?: string; error?: string }> {
+  const modelo = process.env.OPENROUTER_MODEL || "anthropic/claude-sonnet-5";
+  try {
+    const resposta = await chamarOpenRouter(
+      "Responda apenas com a palavra: ok",
+      [{ role: "user", content: "teste de conexão" }],
+      20
+    );
+    return { ok: true, modelo, resposta };
+  } catch (e) {
+    return { ok: false, modelo, error: e instanceof Error ? e.message : String(e) };
+  }
+}
+
 async function redigirComIA(pergunta: string, trechos: Trecho[], clientId: number | null, nomeCliente: string, settings: AgentSettings): Promise<string> {
   const contexto = trechos.map((t, i) => `[Fonte ${i + 1} — ${t.fonte.tipo}: ${t.fonte.titulo}]\n${t.texto}`).join("\n\n");
   const historico = clientId ? await listRecentMessages(clientId, 10) : [];
 
   const system = `Você é o Assistente de Estudos de uma plataforma de acompanhamento psicopedagógico. Você apoia a metodologia da mentora — você não é um produto de IA e não se apresenta como tal.
 
+Como responder (isso é o que mais importa):
+- NUNCA cole ou liste as fontes uma atrás da outra. Leia todas, entenda o que cada uma diz, e escreva uma resposta corrida que RESPONDE DIRETAMENTE à pergunta, conectando as partes relevantes entre si. O leitor não deve perceber que você está "juntando trechos" — deve parecer alguém que leu tudo e já sabe a resposta.
+- Comece respondendo à pergunta em 1 frase direta. Depois, no máximo 2 parágrafos curtos, traga o raciocínio e o contexto específico ${clientId ? `de ${nomeCliente}` : ""} que sustentam essa resposta.
+- Só traga informação das fontes que realmente ajuda a responder a ESTA pergunta — ignore fontes pouco relevantes mesmo que estejam na lista.
+- Não repita rótulos como "Fonte 1" ou nomes de arquivo dentro do texto da resposta — cite naturalmente ("segundo o protocolo que a mentora preparou...", "as sessões recentes mostram que...").
+
 Regras invioláveis:
-- Responda APENAS com base nas fontes fornecidas abaixo (metodologia da mentora, documentos da biblioteca, histórico e prontuário do cliente). Nunca use conhecimento externo, internet ou opinião própria.
-- NUNCA emita diagnóstico, hipótese clínica ou orientação de saúde. Encaminhe esses temas para a mentora.
-- Se as fontes não sustentarem a resposta, diga claramente que não há evidências na base para responder e sugira falar com a mentora.
+- Responda APENAS com base nas fontes fornecidas abaixo (metodologia da mentora, documentos da biblioteca, histórico e prontuário do cliente). Nunca use conhecimento externo, internet ou opinião própria, e nunca invente algo que não esteja nas fontes.
+- Você PODE relatar o que a mentora já registrou (objetivo, queixa, diagnóstico preliminar, notas de sessão) — isso é fato documentado, não invenção sua. O que você NUNCA deve fazer é formular, sugerir ou confirmar um diagnóstico por conta própria, nem dar opinião clínica além do que está escrito. Se perguntarem algo que exige avaliação (não apenas relatar o que já foi anotado), diga isso e encaminhe para a mentora.
+- Se as fontes não sustentarem a resposta, diga claramente que não há evidências na base e sugira falar com a mentora.
 - ${TOM_INSTRUCAO[settings.tom]}
-- Português do Brasil. Respostas curtas (1 a 3 parágrafos), falando diretamente com ${nomeCliente}.
-- Cite naturalmente de qual material da mentora veio a orientação.
+- Português do Brasil.
 ${settings.instrucoesExtra ? `\nInstruções adicionais definidas pela mentora:\n${settings.instrucoesExtra}` : ""}
 
-Fontes disponíveis para esta pergunta:
+Fontes disponíveis para esta pergunta (uso interno seu — não cite os rótulos "Fonte N" na resposta):
 
 ${contexto}`;
 

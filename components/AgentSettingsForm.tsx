@@ -19,11 +19,15 @@ const TOGGLES: { key: keyof Pick<Settings, "usaBiblioteca" | "usaMetodologia" | 
   { key: "usaProntuario", label: "Prontuário", descricao: "Notas de sessão datadas de cada cliente." },
 ];
 
+type TesteResultado = { ok: boolean; modelo?: string; resposta?: string; error?: string };
+
 export default function AgentSettingsForm({ inicial }: { inicial: Settings }) {
   const router = useRouter();
   const [v, setV] = useState<Settings>(inicial);
   const [loading, setLoading] = useState(false);
   const [salvo, setSalvo] = useState(false);
+  const [testando, setTestando] = useState(false);
+  const [teste, setTeste] = useState<TesteResultado | null>(null);
 
   async function salvar() {
     setLoading(true);
@@ -32,6 +36,15 @@ export default function AgentSettingsForm({ inicial }: { inicial: Settings }) {
     setLoading(false);
     setSalvo(true);
     router.refresh();
+  }
+
+  async function testarConexao() {
+    setTestando(true);
+    setTeste(null);
+    const res = await fetch("/api/agente/testar", { method: "POST" });
+    const data = (await res.json().catch(() => ({ ok: false, error: "Falha ao chamar o teste." }))) as TesteResultado;
+    setTeste(data);
+    setTestando(false);
   }
 
   return (
@@ -83,6 +96,19 @@ export default function AgentSettingsForm({ inicial }: { inicial: Settings }) {
           {loading ? "Salvando…" : "Salvar escopo"}
         </button>
         {salvo && <span className="text-[12.5px] text-emerald-700">Salvo ✓</span>}
+      </div>
+
+      <div className="pt-3 border-t border-black/6">
+        <button onClick={testarConexao} disabled={testando} className="rounded-lg border border-black/10 bg-white px-4 py-2 text-sm hover:bg-black/4 disabled:opacity-50">
+          {testando ? "Testando…" : "🔌 Testar conexão com a IA"}
+        </button>
+        {teste && (
+          <p className={`mt-2 text-[12.5px] rounded-lg px-3 py-2 border ${teste.ok ? "text-emerald-700 bg-emerald-50 border-emerald-200" : "text-red-700 bg-red-50 border-red-200"}`}>
+            {teste.ok
+              ? `✅ Conectado — modelo ${teste.modelo} respondeu: "${teste.resposta}"`
+              : `❌ Falhou (modelo ${teste.modelo ?? "?"}): ${teste.error}`}
+          </p>
+        )}
       </div>
     </div>
   );
