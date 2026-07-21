@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { getDb } from "@/lib/db";
+import { listClientDocuments } from "@/lib/data";
 import { getCurrentUser } from "@/lib/auth";
 import UploadForm from "@/components/UploadForm";
 
@@ -8,10 +8,7 @@ const ICONE: Record<string, string> = { pdf: "📕", docx: "📘", doc: "📘", 
 export default async function DocumentosPage() {
   const user = (await getCurrentUser())!;
   if (user.papel !== "cliente" || !user.clientId) redirect("/");
-  const db = getDb();
-  const docs = db
-    .prepare("SELECT id, nome, tipo, criado_em, enviado_por FROM documents WHERE client_id = ? ORDER BY criado_em DESC")
-    .all(user.clientId) as { id: number; nome: string; tipo: string; criado_em: string; enviado_por: string }[];
+  const docs = await listClientDocuments(user.clientId);
 
   return (
     <div className="max-w-2xl">
@@ -29,7 +26,7 @@ export default async function DocumentosPage() {
             <div className="min-w-0 flex-1">
               <div className="text-[13.5px] font-medium truncate">{d.nome}</div>
               <div className="text-[11.5px] text-[var(--ink-muted)]">
-                enviado por {d.enviado_por || "—"} em {d.criado_em.slice(0, 10).split("-").reverse().join("/")}
+                enviado por {d.enviadoPor || "—"} em {d.criadoEm.slice(0, 10).split("-").reverse().join("/")}
               </div>
             </div>
           </a>

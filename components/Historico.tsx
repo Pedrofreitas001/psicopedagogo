@@ -1,11 +1,11 @@
-const ICONE: Record<string, string> = { conversa: "💬", material: "📚", observacao: "📝", resumo: "✨" };
+const ICONE: Record<string, string> = { conversa: "💬", material: "📚", observacao: "📝", resumo: "✨", sessao: "🗒️" };
 
 function dataBr(iso: string): string {
   const [y, m, d] = iso.slice(0, 10).split("-");
   return `${d}/${m}/${y}`;
 }
 
-export default function Historico({ eventos }: { eventos: { tipo: string; descricao: string; criado_em: string }[] }) {
+export default function Historico({ eventos }: { eventos: { tipo: string; descricao: string; criadoEm: string }[] }) {
   if (eventos.length === 0) {
     return (
       <div className="rounded-2xl border border-black/8 bg-[var(--surface-1)] p-6 text-sm text-[var(--ink-muted)]">
@@ -20,7 +20,7 @@ export default function Historico({ eventos }: { eventos: { tipo: string; descri
           <span className="absolute -left-[31px] top-0.5 grid h-5 w-5 place-items-center rounded-full bg-[var(--surface-1)] border border-black/10 text-[10px]">
             {ICONE[e.tipo] ?? "•"}
           </span>
-          <div className="text-[11.5px] text-[var(--ink-muted)]">{dataBr(e.criado_em)}</div>
+          <div className="text-[11.5px] text-[var(--ink-muted)]">{dataBr(e.criadoEm)}</div>
           <div className="text-[13.5px] text-[var(--ink-1)] leading-relaxed">{e.descricao}</div>
         </li>
       ))}

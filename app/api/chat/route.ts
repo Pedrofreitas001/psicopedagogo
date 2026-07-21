@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getDb } from "@/lib/db";
+import { getClient, getConversationClientId } from "@/lib/data";
 import { getCurrentUser } from "@/lib/auth";
 import { responder, salvarConversa } from "@/lib/assistente";
 
@@ -13,32 +13,26 @@ export async function POST(req: Request) {
 
   // Isolamento: cliente só conversa no próprio contexto; mentora escolhe o cliente
   let clientId: number | null = null;
+  let cliente = null;
   if (user.papel === "cliente") {
     clientId = user.clientId;
+    cliente = clientId ? await getClient(clientId) : null;
   } else if (body.clientId) {
-    const db = getDb();
-    const existe = db.prepare("SELECT id FROM clients WHERE id = ? AND workspace_id = 1").get(body.clientId);
-    if (!existe) return NextResponse.json({ error: "Cliente não encontrado." }, { status: 404 });
+    cliente = await getClient(body.clientId);
+    if (!cliente) return NextResponse.json({ error: "Cliente não encontrado." }, { status: 404 });
     clientId = body.clientId;
   }
 
-  const db = getDb();
-  const nomeCliente = clientId
-    ? ((db.prepare("SELECT nome FROM clients WHERE id = ?").get(clientId) as { nome: string })?.nome ?? user.nome)
-    : user.nome;
-
-  const resposta = await responder(pergunta, clientId, nomeCliente);
+  const resposta = await responder(pergunta, clientId, cliente?.nome ?? user.nome);
 
   // Toda conversa é armazenada para consulta futura (regra do produto)
   let conversationId = body.conversationId;
   if (clientId) {
     if (conversationId) {
-      const pertence = db
-        .prepare("SELECT id FROM conversations WHERE id = ? AND client_id = ?")
-        .get(conversationId, clientId);
-      if (!pertence) conversationId = undefined;
+      const dono = await getConversationClientId(conversationId);
+      if (dono !== clientId) conversationId = undefined;
     }
-    conversationId = salvarConversa(clientId, user.nome, pergunta, resposta, conversationId);
+    conversationId = await salvarConversa(clientId, user.nome, pergunta, resposta, conversationId);
   }
 
   return NextResponse.json({ ...resposta, conversationId });

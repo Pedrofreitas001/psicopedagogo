@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { getDb } from "@/lib/db";
+import { countClients, countLibraryDocuments, countConversations } from "@/lib/data";
 import { getCurrentUser } from "@/lib/auth";
 
 function Card({ href, emoji, titulo, descricao }: { href: string; emoji: string; titulo: string; descricao: string }) {
@@ -17,7 +17,6 @@ function Card({ href, emoji, titulo, descricao }: { href: string; emoji: string;
 
 export default async function Home() {
   const user = (await getCurrentUser())!;
-  const db = getDb();
 
   if (user.papel === "cliente") {
     const primeiroNome = user.nome.split(" ")[0];
@@ -36,25 +35,21 @@ export default async function Home() {
     );
   }
 
-  const stats = {
-    clientes: (db.prepare("SELECT COUNT(*) c FROM clients WHERE workspace_id = 1").get() as { c: number }).c,
-    documentos: (db.prepare("SELECT COUNT(*) c FROM documents WHERE workspace_id = 1 AND categoria_id IS NOT NULL").get() as { c: number }).c,
-    conversas: (db.prepare("SELECT COUNT(*) c FROM conversations WHERE workspace_id = 1").get() as { c: number }).c,
-  };
+  const [clientes, documentos, conversas] = await Promise.all([countClients(), countLibraryDocuments(), countConversations()]);
   const primeiroNome = user.nome.split(" ")[0];
 
   return (
     <div className="max-w-3xl">
       <h1 className="text-3xl font-semibold">Olá, {primeiroNome}</h1>
       <p className="mt-2 text-[15px] text-[var(--ink-2)]">
-        {stats.clientes} cliente(s) em acompanhamento · {stats.documentos} materiais na biblioteca · {stats.conversas} conversas registradas
+        {clientes} cliente(s) em acompanhamento · {documentos} materiais na biblioteca · {conversas} conversas registradas
       </p>
       <div className="mt-2 h-px bg-[var(--grid)]" />
       <div className="mt-8 grid grid-cols-1 sm:grid-cols-2 gap-4">
         <Card href="/clientes" emoji="🤝" titulo="Clientes" descricao="A jornada de cada cliente: objetivo, observações, arquivos e histórico." />
         <Card href="/biblioteca" emoji="📚" titulo="Biblioteca" descricao="Seus materiais organizados por pastas — a alma do sistema." />
         <Card href="/assistente" emoji="💬" titulo="Assistente" descricao="Converse com a base de conhecimento no contexto de um cliente." />
-        <Card href="/configuracoes" emoji="⚙️" titulo="Configurações" descricao="Sua metodologia — o que fundamenta as respostas do assistente." />
+        <Card href="/configuracoes" emoji="⚙️" titulo="Configurações" descricao="Sua metodologia e o escopo do assistente." />
       </div>
     </div>
   );

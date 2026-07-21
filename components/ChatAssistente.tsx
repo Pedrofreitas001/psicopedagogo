@@ -7,7 +7,7 @@ type Msg =
   | { papel: "usuario"; texto: string }
   | { papel: "assistente"; texto: string; fontes: Fonte[]; recusado: boolean };
 
-const ROTULO_FONTE: Record<string, string> = { documento: "📄", metodologia: "🧭", historico: "🕰️" };
+const ROTULO_FONTE: Record<string, string> = { documento: "📄", metodologia: "🧭", historico: "🕰️", prontuario: "🗒️" };
 
 export default function ChatAssistente({
   clientes,

@@ -1,20 +1,13 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { getDb } from "@/lib/db";
+import { listClientsWithLastEvent } from "@/lib/data";
 import { getCurrentUser } from "@/lib/auth";
 import ClienteForm from "@/components/ClienteForm";
 
 export default async function ClientesPage() {
   const user = (await getCurrentUser())!;
   if (user.papel !== "mentora") redirect("/");
-  const db = getDb();
-  const clientes = db
-    .prepare(
-      `SELECT c.id, c.nome, c.objetivo, c.user_id,
-              (SELECT MAX(e.criado_em) FROM events e WHERE e.client_id = c.id) AS ultimo_evento
-       FROM clients c WHERE c.workspace_id = 1 ORDER BY c.nome`
-    )
-    .all() as { id: number; nome: string; objetivo: string; user_id: number | null; ultimo_evento: string | null }[];
+  const clientes = await listClientsWithLastEvent();
 
   return (
     <div className="max-w-2xl">
@@ -29,11 +22,14 @@ export default async function ClientesPage() {
               {c.nome.slice(0, 1).toUpperCase()}
             </div>
             <div className="min-w-0 flex-1">
-              <div className="text-[14px] font-medium">{c.nome}</div>
-              <div className="text-[12.5px] text-[var(--ink-muted)] truncate">{c.objetivo || "Objetivo ainda não definido"}</div>
+              <div className="text-[14px] font-medium">
+                {c.nome}
+                {c.idade ? <span className="text-[var(--ink-muted)] font-normal"> · {c.idade} anos</span> : null}
+              </div>
+              <div className="text-[12.5px] text-[var(--ink-muted)] truncate">{c.queixaPrincipal || c.objetivo || "Sem informações ainda"}</div>
             </div>
             <div className="text-[11.5px] text-[var(--ink-muted)] shrink-0">
-              {c.ultimo_evento ? `último registro ${c.ultimo_evento.slice(0, 10).split("-").reverse().join("/")}` : "sem registros"}
+              {c.ultimoEvento ? `último registro ${c.ultimoEvento.slice(0, 10).split("-").reverse().join("/")}` : "sem registros"}
             </div>
           </Link>
         ))}

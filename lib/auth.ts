@@ -1,6 +1,19 @@
 import { cookies } from "next/headers";
 import { cache } from "react";
-import { getDb, type Role } from "./db";
+import {
+  type Role,
+  getUserById,
+  getFirstUser,
+  getUserByAuthId,
+  getUserByEmail,
+  setUserAuthId,
+  hasAnyAuthedUser,
+  createUser,
+  getClientByUserId,
+  getClientByEmail,
+  linkClientUser,
+  createClientForUser,
+} from "./data";
 import { authEnabled, getAuthUser, parseSessionCookie, SESSION_COOKIE } from "./supabase-auth";
 
 /**
@@ -27,24 +40,18 @@ export type CurrentUser = {
   clientId: number | null;
 };
 
-function withClientId(user: { id: number; nome: string; email: string; papel: Role }): CurrentUser {
-  const db = getDb();
-  const client =
-    user.papel === "cliente"
-      ? (db.prepare("SELECT id FROM clients WHERE user_id = ? AND workspace_id = 1").get(user.id) as { id: number } | undefined)
-      : undefined;
+async function withClientId(user: { id: number; nome: string; email: string; papel: Role }): Promise<CurrentUser> {
+  const client = user.papel === "cliente" ? await getClientByUserId(user.id) : null;
   return { ...user, clientId: client?.id ?? null };
 }
 
 export const getCurrentUser = cache(async (): Promise<CurrentUser | null> => {
-  const db = getDb();
   const store = await cookies();
 
   if (!authEnabled()) {
     const uid = parseInt(store.get("uid")?.value ?? "1") || 1;
-    const user =
-      (db.prepare("SELECT id, nome, email, papel FROM users WHERE id = ? AND workspace_id = 1").get(uid) as CurrentUser | undefined) ??
-      (db.prepare("SELECT id, nome, email, papel FROM users WHERE workspace_id = 1 ORDER BY id LIMIT 1").get() as CurrentUser);
+    const user = (await getUserById(uid)) ?? (await getFirstUser());
+    if (!user) return null;
     return withClientId(user);
   }
 
@@ -54,33 +61,22 @@ export const getCurrentUser = cache(async (): Promise<CurrentUser | null> => {
   if (!authUser) return null;
 
   // Provisionamento: auth_id → email semeado → cliente cadastrado → novo usuário
-  let user = db.prepare("SELECT id, nome, email, papel FROM users WHERE auth_id = ? AND workspace_id = 1").get(authUser.id) as
-    | { id: number; nome: string; email: string; papel: Role }
-    | undefined;
+  let user = await getUserByAuthId(authUser.id);
   if (!user) {
-    const byEmail = db
-      .prepare("SELECT id, nome, email, papel FROM users WHERE lower(email) = lower(?) AND workspace_id = 1")
-      .get(authUser.email) as { id: number; nome: string; email: string; papel: Role } | undefined;
+    const byEmail = await getUserByEmail(authUser.email);
     if (byEmail) {
-      db.prepare("UPDATE users SET auth_id = ? WHERE id = ?").run(authUser.id, byEmail.id);
+      await setUserAuthId(byEmail.id, authUser.id);
       user = byEmail;
     } else {
-      const primeiroReal = !db.prepare("SELECT 1 FROM users WHERE auth_id IS NOT NULL AND workspace_id = 1 LIMIT 1").get();
-      const clienteExistente = db
-        .prepare("SELECT id FROM clients WHERE lower(email) = lower(?) AND workspace_id = 1")
-        .get(authUser.email) as { id: number } | undefined;
+      const primeiroReal = !(await hasAnyAuthedUser());
+      const clienteExistente = await getClientByEmail(authUser.email);
       const papel: Role = primeiroReal ? "mentora" : "cliente";
-      const info = db
-        .prepare("INSERT INTO users (workspace_id, nome, email, papel, auth_id) VALUES (1, ?, ?, ?, ?)")
-        .run(authUser.nome, authUser.email, papel, authUser.id);
-      const userId = Number(info.lastInsertRowid);
+      const userId = await createUser({ nome: authUser.nome, email: authUser.email, papel, authId: authUser.id });
       if (papel === "cliente") {
         if (clienteExistente) {
-          db.prepare("UPDATE clients SET user_id = ? WHERE id = ?").run(userId, clienteExistente.id);
+          await linkClientUser(clienteExistente.id, userId);
         } else {
-          db.prepare("INSERT INTO clients (workspace_id, user_id, nome, email) VALUES (1, ?, ?, ?)").run(
-            userId, authUser.nome, authUser.email
-          );
+          await createClientForUser({ userId, nome: authUser.nome, email: authUser.email });
         }
       }
       user = { id: userId, nome: authUser.nome, email: authUser.email, papel };

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getDb, logEvent } from "@/lib/db";
+import { getClient, updateClient, logEvent, type ClientInput } from "@/lib/data";
 import { getCurrentUser } from "@/lib/auth";
 
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -7,22 +7,32 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   if (!user || user.papel !== "mentora") return NextResponse.json({ error: "Apenas a mentora edita clientes." }, { status: 403 });
 
   const { id } = await params;
-  const db = getDb();
-  const atual = db.prepare("SELECT id, observacoes FROM clients WHERE id = ? AND workspace_id = 1").get(Number(id)) as
-    | { id: number; observacoes: string }
-    | undefined;
+  const atual = await getClient(Number(id));
   if (!atual) return NextResponse.json({ error: "Cliente não encontrado." }, { status: 404 });
 
-  const { nome, email, objetivo, observacoes } = (await req.json()) as {
-    nome?: string; email?: string; objetivo?: string; observacoes?: string;
-  };
-  if (!nome?.trim()) return NextResponse.json({ error: "Informe o nome." }, { status: 400 });
+  const body = (await req.json()) as Partial<ClientInput>;
+  if (!body.nome?.trim()) return NextResponse.json({ error: "Informe o nome." }, { status: 400 });
 
-  db.prepare("UPDATE clients SET nome = ?, email = ?, objetivo = ?, observacoes = ? WHERE id = ?").run(
-    nome.trim(), (email ?? "").trim().toLowerCase(), objetivo ?? "", observacoes ?? "", atual.id
-  );
-  if ((observacoes ?? "") !== atual.observacoes) {
-    logEvent(atual.id, "observacao", "Mentora atualizou as observações do acompanhamento.");
+  const idade = body.idade === null || body.idade === undefined || (body.idade as unknown as string) === "" ? null : Number(body.idade);
+  if (idade !== null && (!Number.isInteger(idade) || idade < 0 || idade > 120)) {
+    return NextResponse.json({ error: "Idade inválida." }, { status: 400 });
+  }
+
+  const input: ClientInput = {
+    nome: body.nome,
+    email: body.email ?? "",
+    objetivo: body.objetivo ?? "",
+    observacoes: body.observacoes ?? "",
+    idade,
+    diagnosticoPreliminar: body.diagnosticoPreliminar ?? "",
+    escolaSerie: body.escolaSerie ?? "",
+    responsavelNome: body.responsavelNome ?? "",
+    responsavelContato: body.responsavelContato ?? "",
+    queixaPrincipal: body.queixaPrincipal ?? "",
+  };
+  await updateClient(atual.id, input);
+  if (input.observacoes !== atual.observacoes) {
+    await logEvent(atual.id, "observacao", "Mentora atualizou as observações do acompanhamento.");
   }
   return NextResponse.json({ ok: true });
 }

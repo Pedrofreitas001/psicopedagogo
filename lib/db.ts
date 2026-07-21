@@ -4,12 +4,11 @@ import fs from "fs";
 import os from "os";
 
 /**
- * Camada de persistência do MVP.
- *
- * SQLite para rodar sem infraestrutura externa; o schema espelha o Postgres
- * do Supabase (ver supabase/schema.sql) para que a migração com Row Level
- * Security seja 1:1 — todo dado sensível carrega workspace_id e os dados de
- * cliente carregam client_id, que é a chave do isolamento por usuário.
+ * Motor SQLite — usado apenas como fallback local/demo (sem Supabase
+ * configurado). Em produção (SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY), toda
+ * a leitura/escrita passa pelo Postgres do Supabase via REST — ver lib/data.ts.
+ * O schema aqui espelha supabase/schema.sql para manter os dois caminhos
+ * equivalentes.
  */
 
 export type Role = "mentora" | "cliente";
@@ -18,8 +17,9 @@ let _db: Database.Database | null = null;
 
 /**
  * Diretório gravável para o SQLite. Em serverless (Vercel) o filesystem do
- * projeto é somente leitura, então caímos para /tmp — o banco demo é
- * ressemeado a cada cold start (persistência real: Supabase Postgres).
+ * projeto é somente leitura, então caímos para /tmp — e por isso o SQLite
+ * NUNCA deve ser a persistência real em produção (cada instância pode ter um
+ * /tmp diferente). Use sempre o Postgres do Supabase em produção.
  */
 function resolveDataDir(): string {
   if (process.env.DB_DIR) {
@@ -44,8 +44,8 @@ export function uploadsDir(): string {
   return dir;
 }
 
-/** Versão do schema. DBs demo de versão antiga são recriados. */
-const SCHEMA_VERSION = 2;
+/** Versão do schema. DBs demo de versão antiga são recriados (só afeta o modo local/demo). */
+const SCHEMA_VERSION = 3;
 
 export function getDb(): Database.Database {
   if (_db) return _db;
@@ -95,6 +95,12 @@ function migrate(db: Database.Database) {
     email TEXT NOT NULL DEFAULT '',
     objetivo TEXT NOT NULL DEFAULT '',
     observacoes TEXT NOT NULL DEFAULT '',
+    idade INTEGER,
+    diagnostico_preliminar TEXT NOT NULL DEFAULT '',
+    escola_serie TEXT NOT NULL DEFAULT '',
+    responsavel_nome TEXT NOT NULL DEFAULT '',
+    responsavel_contato TEXT NOT NULL DEFAULT '',
+    queixa_principal TEXT NOT NULL DEFAULT '',
     criado_em TEXT NOT NULL DEFAULT (datetime('now'))
   );
   -- Pastas da biblioteca (árvore por parent_id).
@@ -116,6 +122,7 @@ function migrate(db: Database.Database) {
     tamanho INTEGER NOT NULL DEFAULT 0,
     storage_path TEXT NOT NULL DEFAULT '',
     conteudo TEXT NOT NULL DEFAULT '',
+    disponivel_assistente INTEGER NOT NULL DEFAULT 1,
     enviado_por TEXT NOT NULL DEFAULT '',
     criado_em TEXT NOT NULL DEFAULT (datetime('now'))
   );
@@ -148,21 +155,37 @@ function migrate(db: Database.Database) {
     id INTEGER PRIMARY KEY,
     workspace_id INTEGER NOT NULL REFERENCES workspaces(id),
     client_id INTEGER NOT NULL REFERENCES clients(id),
-    tipo TEXT NOT NULL CHECK (tipo IN ('conversa','material','observacao','resumo')),
+    tipo TEXT NOT NULL CHECK (tipo IN ('conversa','material','observacao','resumo','sessao')),
     descricao TEXT NOT NULL,
     criado_em TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+  -- Prontuário: notas de sessão datadas por cliente.
+  CREATE TABLE IF NOT EXISTS session_notes (
+    id INTEGER PRIMARY KEY,
+    workspace_id INTEGER NOT NULL REFERENCES workspaces(id),
+    client_id INTEGER NOT NULL REFERENCES clients(id),
+    data_sessao TEXT NOT NULL,
+    conteudo TEXT NOT NULL,
+    criado_por TEXT NOT NULL DEFAULT '',
+    criado_em TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+  -- Escopo/comportamento do assistente (singleton por workspace).
+  CREATE TABLE IF NOT EXISTS agent_settings (
+    id INTEGER PRIMARY KEY,
+    workspace_id INTEGER NOT NULL REFERENCES workspaces(id),
+    usa_biblioteca INTEGER NOT NULL DEFAULT 1,
+    usa_metodologia INTEGER NOT NULL DEFAULT 1,
+    usa_historico INTEGER NOT NULL DEFAULT 1,
+    usa_prontuario INTEGER NOT NULL DEFAULT 1,
+    instrucoes_extra TEXT NOT NULL DEFAULT '',
+    tom TEXT NOT NULL DEFAULT 'acolhedor'
   );
   `);
 }
 
-export function logEvent(clientId: number, tipo: "conversa" | "material" | "observacao" | "resumo", descricao: string) {
-  getDb()
-    .prepare("INSERT INTO events (workspace_id, client_id, tipo, descricao) VALUES (1, ?, ?, ?)")
-    .run(clientId, tipo, descricao);
-}
-
 function seed(db: Database.Database) {
   db.prepare("INSERT INTO workspaces (id, nome) VALUES (1, ?)").run("Espaço Aprender");
+  db.prepare("INSERT INTO agent_settings (workspace_id) VALUES (1)").run();
 
   const insertUser = db.prepare("INSERT INTO users (workspace_id, nome, email, papel) VALUES (1, ?, ?, ?)");
   insertUser.run("Mariana Duarte", "mentora@espacoaprender.demo", "mentora");
@@ -170,21 +193,34 @@ function seed(db: Database.Database) {
   const uLuisa = insertUser.run("Luísa", "luisa@espacoaprender.demo", "cliente");
 
   const insertClient = db.prepare(
-    "INSERT INTO clients (workspace_id, user_id, nome, email, objetivo, observacoes, criado_em) VALUES (1, ?, ?, ?, ?, ?, datetime('now','-40 days'))"
+    `INSERT INTO clients (workspace_id, user_id, nome, email, objetivo, observacoes, idade, diagnostico_preliminar, escola_serie, responsavel_nome, responsavel_contato, queixa_principal, criado_em)
+     VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now','-40 days'))`
   );
   const cPedro = insertClient.run(
     uPedro.lastInsertRowid,
     "Pedro",
     "pedro@espacoaprender.demo",
     "Desenvolver fluência e compreensão de leitura, com mais autonomia nas atividades escolares.",
-    "Diagnóstico de dislexia (laudo externo). Responde bem a atividades curtas e lúdicas; fadiga em textos longos. Família participativa."
+    "Responde bem a atividades curtas e lúdicas; fadiga em textos longos. Família participativa.",
+    9,
+    "Dislexia (laudo externo)",
+    "4º ano — Escola Municipal Jardim das Flores",
+    "Camila (mãe)",
+    "(11) 90000-0001",
+    "Dificuldade para ler em voz alta na escola; troca e omite letras na escrita."
   );
   insertClient.run(
     uLuisa.lastInsertRowid,
     "Luísa",
     "luisa@espacoaprender.demo",
     "Fortalecer a atenção sustentada e a organização das rotinas de estudo.",
-    "Em avaliação inicial. Interesses: desenho e música — bons ganchos para as atividades."
+    "Em avaliação inicial. Interesses: desenho e música — bons ganchos para as atividades.",
+    11,
+    "Em investigação — possível TDAH (encaminhada para avaliação neuropsicológica)",
+    "6º ano — Colégio Santa Clara",
+    "Roberto (pai)",
+    "(11) 90000-0002",
+    "Dificuldade de concentração e organização das tarefas escolares."
   );
 
   // Biblioteca: Leitura → Dislexia → Protocolos / Materiais / Exercícios
@@ -252,7 +288,7 @@ function seed(db: Database.Database) {
       "Terminar sempre com uma atividade em que o cliente se sinta competente."
   );
 
-  // Histórico demo do Pedro: conversa + eventos, como no roteiro do produto
+  // Histórico demo do Pedro: conversa + eventos + uma nota de sessão, como no roteiro do produto
   const conv = db
     .prepare("INSERT INTO conversations (workspace_id, client_id, titulo, criado_em) VALUES (1, ?, ?, datetime('now','-3 days'))")
     .run(cPedro.lastInsertRowid, "Dificuldade com leitura em voz alta");
@@ -278,5 +314,12 @@ function seed(db: Database.Database) {
   );
   insertEvent.run(cPedro.lastInsertRowid, "conversa", "Pedro perguntou ao assistente sobre leitura em voz alta.", "-3 days");
   insertEvent.run(cPedro.lastInsertRowid, "material", "Mariana enviou a atividade \"Leitura compartilhada\" para casa.", "-2 days");
-  insertEvent.run(cPedro.lastInsertRowid, "observacao", "Sessão presencial: leitura pareada com menos tensão; Pedro pediu para reler o trecho sozinho.", "-1 days");
+  insertEvent.run(cPedro.lastInsertRowid, "sessao", "Registro de sessão adicionado ao prontuário.", "-1 days");
+
+  db.prepare(
+    "INSERT INTO session_notes (workspace_id, client_id, data_sessao, conteudo, criado_por, criado_em) VALUES (1, ?, date('now','-1 days'), ?, 'Mariana Duarte', datetime('now','-1 days'))"
+  ).run(
+    cPedro.lastInsertRowid,
+    "Sessão presencial: leitura pareada com menos tensão; Pedro pediu para reler o trecho sozinho. Manteve o foco pelos 15 minutos completos. Combinado: repetir o mesmo protocolo em casa 3x por semana."
+  );
 }

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getDb } from "@/lib/db";
+import { getCategory, createCategory } from "@/lib/data";
 import { getCurrentUser } from "@/lib/auth";
 
 export async function POST(req: Request) {
@@ -9,12 +9,9 @@ export async function POST(req: Request) {
   const { nome, parentId } = (await req.json()) as { nome?: string; parentId?: number | null };
   if (!nome?.trim()) return NextResponse.json({ error: "Dê um nome à pasta." }, { status: 400 });
 
-  const db = getDb();
-  if (parentId && !db.prepare("SELECT id FROM categories WHERE id = ? AND workspace_id = 1").get(parentId)) {
+  if (parentId && !(await getCategory(parentId))) {
     return NextResponse.json({ error: "Pasta de destino não encontrada." }, { status: 404 });
   }
-  const info = db
-    .prepare("INSERT INTO categories (workspace_id, nome, parent_id) VALUES (1, ?, ?)")
-    .run(nome.trim().slice(0, 60), parentId ?? null);
-  return NextResponse.json({ ok: true, id: Number(info.lastInsertRowid) });
+  const id = await createCategory(nome.trim().slice(0, 60), parentId ?? null);
+  return NextResponse.json({ ok: true, id });
 }

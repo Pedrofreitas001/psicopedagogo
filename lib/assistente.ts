@@ -1,21 +1,36 @@
-import Anthropic from "@anthropic-ai/sdk";
-import { getDb, logEvent } from "./db";
+import {
+  listKnowledge,
+  listLibraryDocuments,
+  listClientDocuments,
+  getClient,
+  listClientEvents,
+  listRecentSessionNotes,
+  listRecentMessages,
+  listAllMessages,
+  createConversation,
+  createMessage,
+  logEvent,
+  getAgentSettings,
+  type AgentSettings,
+} from "./data";
 
 /**
- * Assistente de Estudos — responde usando exclusivamente:
+ * Assistente de Estudos — responde usando exclusivamente as fontes ligadas em
+ * Configurações → Escopo do assistente:
  *   1. a metodologia cadastrada pela mentora (tabela knowledge);
- *   2. os documentos da biblioteca (texto extraído/informado no upload);
- *   3. o histórico daquele cliente (conversas e linha do tempo).
+ *   2. os documentos da biblioteca e do cliente marcados como disponíveis;
+ *   3. o histórico daquele cliente (objetivo/observações e linha do tempo);
+ *   4. o prontuário (notas de sessão datadas).
  *
  * Nunca internet, nunca opinião própria, nunca diagnóstico. Quando a base
  * não sustenta uma resposta, ele diz isso com clareza.
  *
- * Com ANTHROPIC_API_KEY definida, a redação final é feita pelo Claude com um
- * prompt rígido de fundamentação; sem a chave, o assistente compõe a resposta
- * diretamente dos trechos recuperados (modo demo, 100% offline).
+ * Com OPENROUTER_API_KEY definida, a redação final é feita por um modelo via
+ * OpenRouter com um prompt rígido de fundamentação; sem a chave, o assistente
+ * compõe a resposta diretamente dos trechos recuperados (modo demo, offline).
  */
 
-export type Fonte = { tipo: "documento" | "metodologia" | "historico"; titulo: string };
+export type Fonte = { tipo: "documento" | "metodologia" | "historico" | "prontuario"; titulo: string };
 export type RespostaAssistente = { resposta: string; fontes: Fonte[]; recusado: boolean };
 
 const STOPWORDS = new Set(
@@ -37,43 +52,48 @@ function tokens(text: string): string[] {
 
 type Trecho = { fonte: Fonte; texto: string; score: number };
 
-/** Recupera os trechos da base mais relacionados à pergunta, no escopo do cliente. */
-export function recuperarBase(pergunta: string, clientId: number | null): Trecho[] {
-  const db = getDb();
+/** Recupera os trechos da base mais relacionados à pergunta, no escopo do cliente e do agente. */
+export async function recuperarBase(pergunta: string, clientId: number | null, settings: AgentSettings): Promise<Trecho[]> {
   const q = new Set(tokens(pergunta));
   if (q.size === 0) return [];
 
   const candidatos: { fonte: Fonte; texto: string }[] = [];
 
-  const know = db.prepare("SELECT titulo, conteudo FROM knowledge WHERE workspace_id = 1").all() as { titulo: string; conteudo: string }[];
-  for (const k of know) candidatos.push({ fonte: { tipo: "metodologia", titulo: k.titulo }, texto: `${k.titulo}. ${k.conteudo}` });
+  if (settings.usaMetodologia) {
+    const know = await listKnowledge();
+    for (const k of know) candidatos.push({ fonte: { tipo: "metodologia", titulo: k.titulo }, texto: `${k.titulo}. ${k.conteudo}` });
+  }
 
-  // Biblioteca (compartilhada) + arquivos do próprio cliente
-  const docs = db
-    .prepare(
-      "SELECT nome, conteudo FROM documents WHERE workspace_id = 1 AND conteudo != '' AND (categoria_id IS NOT NULL OR client_id = ?)"
-    )
-    .all(clientId ?? -1) as { nome: string; conteudo: string }[];
-  for (const d of docs) candidatos.push({ fonte: { tipo: "documento", titulo: d.nome }, texto: `${d.nome}. ${d.conteudo}` });
+  if (settings.usaBiblioteca) {
+    const biblioteca = await listLibraryDocuments();
+    const doCliente = clientId ? await listClientDocuments(clientId) : [];
+    for (const d of [...biblioteca, ...doCliente]) {
+      if (!d.disponivelAssistente || !d.conteudo) continue;
+      candidatos.push({ fonte: { tipo: "documento", titulo: d.nome }, texto: `${d.nome}. ${d.conteudo}` });
+    }
+  }
 
-  if (clientId) {
-    const cli = db
-      .prepare("SELECT nome, objetivo, observacoes FROM clients WHERE id = ? AND workspace_id = 1")
-      .get(clientId) as { nome: string; objetivo: string; observacoes: string } | undefined;
-    if (cli && (cli.objetivo || cli.observacoes)) {
+  if (clientId && settings.usaHistorico) {
+    const cli = await getClient(clientId);
+    if (cli && (cli.objetivo || cli.observacoes || cli.diagnosticoPreliminar || cli.queixaPrincipal)) {
       candidatos.push({
         fonte: { tipo: "historico", titulo: `Acompanhamento de ${cli.nome}` },
-        texto: `Objetivo do acompanhamento: ${cli.objetivo}. Observações da mentora: ${cli.observacoes}`,
+        texto: `Objetivo do acompanhamento: ${cli.objetivo}. Observações da mentora: ${cli.observacoes}. Queixa principal: ${cli.queixaPrincipal}. Diagnóstico preliminar: ${cli.diagnosticoPreliminar}.`,
       });
     }
-    const eventos = db
-      .prepare("SELECT descricao FROM events WHERE client_id = ? ORDER BY criado_em DESC LIMIT 12")
-      .all(clientId) as { descricao: string }[];
+    const eventos = await listClientEvents(clientId, 12);
     if (eventos.length) {
       candidatos.push({
         fonte: { tipo: "historico", titulo: "Linha do tempo recente" },
         texto: eventos.map((e) => e.descricao).join(" "),
       });
+    }
+  }
+
+  if (clientId && settings.usaProntuario) {
+    const notas = await listRecentSessionNotes(clientId, 8);
+    for (const nota of notas) {
+      candidatos.push({ fonte: { tipo: "prontuario", titulo: `Sessão de ${nota.dataSessao.slice(0, 10).split("-").reverse().join("/")}` }, texto: nota.conteudo });
     }
   }
 
@@ -101,30 +121,18 @@ const RECUSA =
   "com segurança. Prefiro não arriscar uma resposta sem fundamento. Que tal levar essa dúvida diretamente para a mentora " +
   "no próximo encontro? Ela pode avaliar com calma e, se fizer sentido, incluir um material sobre isso na biblioteca.";
 
-function historicoRecente(clientId: number): { papel: "usuario" | "assistente"; conteudo: string }[] {
-  const db = getDb();
-  return (
-    db
-      .prepare(
-        `SELECT m.papel, m.conteudo FROM messages m
-         JOIN conversations c ON c.id = m.conversation_id
-         WHERE c.client_id = ? ORDER BY m.id DESC LIMIT 10`
-      )
-      .all(clientId) as { papel: "usuario" | "assistente"; conteudo: string }[]
-  ).reverse();
-}
-
 export async function responder(pergunta: string, clientId: number | null, nomeCliente: string): Promise<RespostaAssistente> {
-  const trechos = recuperarBase(pergunta, clientId);
+  const settings = await getAgentSettings();
+  const trechos = await recuperarBase(pergunta, clientId, settings);
   // Sem apoio mínimo na base → recusa transparente (regra do produto)
   if (trechos.length === 0 || trechos[0].score < 0.5) {
     return { resposta: RECUSA, fontes: [], recusado: true };
   }
   const fontes = trechos.map((t) => t.fonte);
 
-  if (process.env.ANTHROPIC_API_KEY) {
+  if (process.env.OPENROUTER_API_KEY) {
     try {
-      const resposta = await redigirComClaude(pergunta, trechos, clientId, nomeCliente);
+      const resposta = await redigirComIA(pergunta, trechos, clientId, nomeCliente, settings);
       return { resposta, fontes, recusado: false };
     } catch {
       // Falha de API não pode derrubar o atendimento: cai no modo offline
@@ -149,130 +157,130 @@ function resumirTrecho(texto: string): string {
   return frases.join(" ").slice(0, 600);
 }
 
-async function redigirComClaude(pergunta: string, trechos: Trecho[], clientId: number | null, nomeCliente: string): Promise<string> {
-  const client = new Anthropic();
-  const contexto = trechos
-    .map((t, i) => `[Fonte ${i + 1} — ${t.fonte.tipo}: ${t.fonte.titulo}]\n${t.texto}`)
-    .join("\n\n");
-  const historico = clientId ? historicoRecente(clientId) : [];
+const TOM_INSTRUCAO: Record<AgentSettings["tom"], string> = {
+  acolhedor: "Tom: acolhedor, encorajador e simples, como uma mentora carinhosa.",
+  formal: "Tom: profissional e formal, como um relatório técnico claro.",
+  direto: "Tom: direto e objetivo, frases curtas, sem rodeios.",
+};
+
+/** Chama um modelo via OpenRouter (API compatível com OpenAI) para redigir a resposta final. */
+async function chamarOpenRouter(system: string, messages: { role: "user" | "assistant"; content: string }[], maxTokens: number): Promise<string> {
+  const apiKey = process.env.OPENROUTER_API_KEY;
+  if (!apiKey) throw new Error("OPENROUTER_API_KEY não configurada");
+  const model = process.env.OPENROUTER_MODEL || "anthropic/claude-sonnet-4.5";
+
+  const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+      "HTTP-Referer": process.env.OPENROUTER_SITE_URL || "https://espacoaprender.app",
+      "X-Title": process.env.OPENROUTER_SITE_NAME || "Espaço Aprender",
+    },
+    body: JSON.stringify({
+      model,
+      max_tokens: maxTokens,
+      messages: [{ role: "system", content: system }, ...messages],
+    }),
+    cache: "no-store",
+  });
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    throw new Error(`OpenRouter falhou (${res.status}): ${body.slice(0, 300)}`);
+  }
+  const data = (await res.json()) as { choices?: { message?: { content?: string } }[] };
+  const texto = data.choices?.[0]?.message?.content?.trim();
+  if (!texto) throw new Error("Resposta vazia da OpenRouter");
+  return texto;
+}
+
+async function redigirComIA(pergunta: string, trechos: Trecho[], clientId: number | null, nomeCliente: string, settings: AgentSettings): Promise<string> {
+  const contexto = trechos.map((t, i) => `[Fonte ${i + 1} — ${t.fonte.tipo}: ${t.fonte.titulo}]\n${t.texto}`).join("\n\n");
+  const historico = clientId ? await listRecentMessages(clientId, 10) : [];
 
   const system = `Você é o Assistente de Estudos de uma plataforma de acompanhamento psicopedagógico. Você apoia a metodologia da mentora — você não é um produto de IA e não se apresenta como tal.
 
 Regras invioláveis:
-- Responda APENAS com base nas fontes fornecidas abaixo (metodologia da mentora, documentos da biblioteca e histórico do cliente). Nunca use conhecimento externo, internet ou opinião própria.
+- Responda APENAS com base nas fontes fornecidas abaixo (metodologia da mentora, documentos da biblioteca, histórico e prontuário do cliente). Nunca use conhecimento externo, internet ou opinião própria.
 - NUNCA emita diagnóstico, hipótese clínica ou orientação de saúde. Encaminhe esses temas para a mentora.
 - Se as fontes não sustentarem a resposta, diga claramente que não há evidências na base para responder e sugira falar com a mentora.
-- Tom: acolhedor, encorajador e simples. Português do Brasil. Respostas curtas (1 a 3 parágrafos), falando diretamente com ${nomeCliente}.
+- ${TOM_INSTRUCAO[settings.tom]}
+- Português do Brasil. Respostas curtas (1 a 3 parágrafos), falando diretamente com ${nomeCliente}.
 - Cite naturalmente de qual material da mentora veio a orientação.
+${settings.instrucoesExtra ? `\nInstruções adicionais definidas pela mentora:\n${settings.instrucoesExtra}` : ""}
 
 Fontes disponíveis para esta pergunta:
 
 ${contexto}`;
 
-  const messages: Anthropic.MessageParam[] = [
+  const messages: { role: "user" | "assistant"; content: string }[] = [
     ...historico.map((m) => ({ role: m.papel === "usuario" ? ("user" as const) : ("assistant" as const), content: m.conteudo })),
     { role: "user", content: pergunta },
   ];
 
-  const response = await client.messages.create({
-    model: "claude-opus-4-8",
-    max_tokens: 1024,
-    system,
-    messages,
-  });
-  const texto = response.content
-    .filter((b): b is Anthropic.TextBlock => b.type === "text")
-    .map((b) => b.text)
-    .join("\n")
-    .trim();
-  if (!texto) throw new Error("Resposta vazia");
-  return texto;
+  return chamarOpenRouter(system, messages, 1024);
 }
 
 /** Salva a troca no banco e registra o evento na linha do tempo. */
-export function salvarConversa(
+export async function salvarConversa(
   clientId: number,
   autor: string,
   pergunta: string,
   resposta: RespostaAssistente,
   conversationId?: number
-): number {
-  const db = getDb();
+): Promise<number> {
   let convId = conversationId;
   if (!convId) {
-    const info = db
-      .prepare("INSERT INTO conversations (workspace_id, client_id, titulo) VALUES (1, ?, ?)")
-      .run(clientId, pergunta.slice(0, 80));
-    convId = Number(info.lastInsertRowid);
-    logEvent(clientId, "conversa", `${autor} iniciou uma conversa: “${pergunta.slice(0, 80)}”.`);
+    convId = await createConversation(clientId, pergunta.slice(0, 80));
+    await logEvent(clientId, "conversa", `${autor} iniciou uma conversa: “${pergunta.slice(0, 80)}”.`);
   }
-  const insert = db.prepare(
-    "INSERT INTO messages (conversation_id, papel, autor, conteudo, fontes) VALUES (?, ?, ?, ?, ?)"
-  );
-  insert.run(convId, "usuario", autor, pergunta, "[]");
-  insert.run(convId, "assistente", "Assistente de Estudos", resposta.resposta, JSON.stringify(resposta.fontes));
+  await createMessage({ conversationId: convId, papel: "usuario", autor, conteudo: pergunta, fontes: [] });
+  await createMessage({ conversationId: convId, papel: "assistente", autor: "Assistente de Estudos", conteudo: resposta.resposta, fontes: resposta.fontes });
   return convId;
 }
 
 /**
  * "Gerar resumo da evolução": lê todas as conversas e eventos do cliente e
- * produz uma síntese para a mentora. Com Claude quando há chave; senão, um
- * resumo estruturado determinístico.
+ * produz uma síntese para a mentora. Com IA (OpenRouter) quando há chave;
+ * senão, um resumo estruturado determinístico.
  */
 export async function gerarResumoEvolucao(clientId: number): Promise<string> {
-  const db = getDb();
-  const cli = db.prepare("SELECT nome, objetivo, observacoes FROM clients WHERE id = ?").get(clientId) as
-    | { nome: string; objetivo: string; observacoes: string }
-    | undefined;
+  const cli = await getClient(clientId);
   if (!cli) throw new Error("Cliente não encontrado");
 
-  const msgs = db
-    .prepare(
-      `SELECT m.papel, m.autor, m.conteudo, m.criado_em FROM messages m
-       JOIN conversations c ON c.id = m.conversation_id
-       WHERE c.client_id = ? ORDER BY m.id ASC LIMIT 200`
-    )
-    .all(clientId) as { papel: string; autor: string; conteudo: string; criado_em: string }[];
-  const eventos = db
-    .prepare("SELECT tipo, descricao, criado_em FROM events WHERE client_id = ? ORDER BY criado_em ASC LIMIT 100")
-    .all(clientId) as { tipo: string; descricao: string; criado_em: string }[];
+  const msgs = await listAllMessages(clientId);
+  const eventos = await listClientEvents(clientId, 100);
 
-  if (process.env.ANTHROPIC_API_KEY && (msgs.length > 0 || eventos.length > 0)) {
+  if (process.env.OPENROUTER_API_KEY && (msgs.length > 0 || eventos.length > 0)) {
     try {
-      const client = new Anthropic();
       const material = [
-        `Cliente: ${cli.nome}`,
+        `Cliente: ${cli.nome}${cli.idade ? ` (${cli.idade} anos)` : ""}`,
         `Objetivo do acompanhamento: ${cli.objetivo || "—"}`,
+        `Queixa principal: ${cli.queixaPrincipal || "—"}`,
+        `Diagnóstico preliminar: ${cli.diagnosticoPreliminar || "—"}`,
         `Observações da mentora: ${cli.observacoes || "—"}`,
         "",
         "Linha do tempo:",
-        ...eventos.map((e) => `- [${e.criado_em.slice(0, 10)}] (${e.tipo}) ${e.descricao}`),
+        ...eventos.map((e) => `- [${e.criadoEm.slice(0, 10)}] (${e.tipo}) ${e.descricao}`),
         "",
         "Conversas com o assistente:",
-        ...msgs.map((m) => `- [${m.criado_em.slice(0, 10)}] ${m.autor}: ${m.conteudo}`),
+        ...msgs.map((m) => `- [${m.criadoEm.slice(0, 10)}] ${m.autor}: ${m.conteudo}`),
       ].join("\n");
-      const response = await client.messages.create({
-        model: "claude-opus-4-8",
-        max_tokens: 800,
-        system:
-          "Você redige, para uma psicopedagoga, um resumo da evolução de um cliente em acompanhamento. Use APENAS o material fornecido " +
+      const texto = await chamarOpenRouter(
+        "Você redige, para uma psicopedagoga, um resumo da evolução de um cliente em acompanhamento. Use APENAS o material fornecido " +
           "(linha do tempo e conversas) — nada externo. Não emita diagnóstico. Escreva 1 a 2 parágrafos em português do Brasil, tom " +
           "profissional e objetivo: avanços observados, dificuldades que persistem e sugestão de foco para os próximos encontros.",
-        messages: [{ role: "user", content: material }],
-      });
-      const texto = response.content
-        .filter((b): b is Anthropic.TextBlock => b.type === "text")
-        .map((b) => b.text)
-        .join("\n")
-        .trim();
-      if (texto) return registrarResumo(clientId, texto);
+        [{ role: "user", content: material }],
+        800
+      );
+      if (texto) return await registrarResumo(clientId, texto);
     } catch {
       // cai no resumo determinístico
     }
   }
 
   // Resumo determinístico (modo demo)
-  const nConversas = new Set(msgs.map((m) => m.criado_em.slice(0, 10))).size;
+  const nConversas = new Set(msgs.map((m) => m.criadoEm.slice(0, 10))).size;
   const perguntas = msgs.filter((m) => m.papel === "usuario").map((m) => m.conteudo);
   const temas = temasFrequentes(perguntas.join(" "));
   const ultimos = eventos.slice(-3).map((e) => e.descricao);
@@ -282,11 +290,11 @@ export async function gerarResumoEvolucao(clientId: number): Promise<string> {
     (ultimos.length ? `Registros recentes: ${ultimos.join(" ")} ` : "") +
     `O objetivo vigente é: ${cli.objetivo || "ainda não definido"}. ` +
     `Sugere-se revisar esses pontos no próximo encontro e atualizar as observações do acompanhamento.`;
-  return registrarResumo(clientId, texto);
+  return await registrarResumo(clientId, texto);
 }
 
-function registrarResumo(clientId: number, texto: string): string {
-  logEvent(clientId, "resumo", "Resumo da evolução gerado pela mentora.");
+async function registrarResumo(clientId: number, texto: string): Promise<string> {
+  await logEvent(clientId, "resumo", "Resumo da evolução gerado pela mentora.");
   return texto;
 }
 
