@@ -3,6 +3,16 @@
 -- Rode no SQL Editor do Supabase (Project → SQL Editor → New query → colar e Run).
 
 -- ---------------------------------------------------------------------------
+-- 0. Workspace padrão — o schema.sql original criava as tabelas mas nunca
+--    inseria essa linha; toda a aplicação assume workspace_id = 1, então sem
+--    ela qualquer gravação (clientes, agentes, etc.) falha por chave estrangeira.
+-- ---------------------------------------------------------------------------
+insert into workspaces (id, nome)
+  overriding system value
+  select 1, 'Espaço Aprender'
+  where not exists (select 1 from workspaces where id = 1);
+
+-- ---------------------------------------------------------------------------
 -- 1. Ficha de cliente mais completa
 -- ---------------------------------------------------------------------------
 alter table clients add column if not exists idade integer;
