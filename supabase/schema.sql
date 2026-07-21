@@ -178,5 +178,6 @@ create policy cliente_session_notes on session_notes for select using (client_id
 -- Storage: bucket privado `documentos` (downloads via URL assinada no servidor)
 insert into storage.buckets (id, name, public) values ('documentos', 'documentos', false);
 
--- Workspace padrão — toda a aplicação assume workspace_id = 1.
-insert into workspaces (id, nome) overriding system value values (1, 'Espaço Aprender');
+-- Workspace padrão — toda a aplicação assume workspace_id = 1. Como esta é a
+-- primeira linha de uma tabela recém-criada, o id gerado automaticamente é 1.
+insert into workspaces (nome) values ('Espaço Aprender');

@@ -7,10 +7,9 @@
 --    inseria essa linha; toda a aplicação assume workspace_id = 1, então sem
 --    ela qualquer gravação (clientes, agentes, etc.) falha por chave estrangeira.
 -- ---------------------------------------------------------------------------
-insert into workspaces (id, nome)
-  overriding system value
-  select 1, 'Espaço Aprender'
-  where not exists (select 1 from workspaces where id = 1);
+insert into workspaces (nome)
+  select 'Espaço Aprender'
+  where not exists (select 1 from workspaces);
 
 -- ---------------------------------------------------------------------------
 -- 1. Ficha de cliente mais completa
