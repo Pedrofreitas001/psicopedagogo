@@ -23,8 +23,10 @@ export async function PATCH(req: Request) {
     usaMetodologia: body.usaMetodologia ?? atual.usaMetodologia,
     usaHistorico: body.usaHistorico ?? atual.usaHistorico,
     usaProntuario: body.usaProntuario ?? atual.usaProntuario,
+    usaProtocolos: body.usaProtocolos ?? atual.usaProtocolos,
     instrucoesExtra: (body.instrucoesExtra ?? atual.instrucoesExtra).slice(0, 2000),
     tom: (body.tom as AgentSettings["tom"]) ?? atual.tom,
+    modelo: (body.modelo ?? atual.modelo).slice(0, 200),
   };
   await updateAgentSettings(novo);
   return NextResponse.json({ ok: true });

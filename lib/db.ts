@@ -45,7 +45,7 @@ export function uploadsDir(): string {
 }
 
 /** Versão do schema. DBs demo de versão antiga são recriados (só afeta o modo local/demo). */
-const SCHEMA_VERSION = 3;
+const SCHEMA_VERSION = 5;
 
 export function getDb(): Database.Database {
   if (_db) return _db;
@@ -67,8 +67,10 @@ export function getDb(): Database.Database {
 }
 
 function wipe(db: Database.Database) {
+  db.pragma("foreign_keys = OFF");
   const tables = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'").all() as { name: string }[];
   for (const t of tables) db.exec(`DROP TABLE IF EXISTS ${t.name}`);
+  db.pragma("foreign_keys = ON");
 }
 
 function migrate(db: Database.Database) {
@@ -155,7 +157,7 @@ function migrate(db: Database.Database) {
     id INTEGER PRIMARY KEY,
     workspace_id INTEGER NOT NULL REFERENCES workspaces(id),
     client_id INTEGER NOT NULL REFERENCES clients(id),
-    tipo TEXT NOT NULL CHECK (tipo IN ('conversa','material','observacao','resumo','sessao')),
+    tipo TEXT NOT NULL CHECK (tipo IN ('conversa','material','observacao','resumo','sessao','protocolo')),
     descricao TEXT NOT NULL,
     criado_em TEXT NOT NULL DEFAULT (datetime('now'))
   );
@@ -177,8 +179,60 @@ function migrate(db: Database.Database) {
     usa_metodologia INTEGER NOT NULL DEFAULT 1,
     usa_historico INTEGER NOT NULL DEFAULT 1,
     usa_prontuario INTEGER NOT NULL DEFAULT 1,
+    usa_protocolos INTEGER NOT NULL DEFAULT 1,
     instrucoes_extra TEXT NOT NULL DEFAULT '',
-    tom TEXT NOT NULL DEFAULT 'acolhedor'
+    tom TEXT NOT NULL DEFAULT 'acolhedor',
+    modelo TEXT NOT NULL DEFAULT ''
+  );
+
+  -- Protocolos: modelo (template) de avaliação/atividade estruturada, com
+  -- seções e campos — reutilizável para qualquer protocolo que a mentora traga.
+  CREATE TABLE IF NOT EXISTS protocols (
+    id INTEGER PRIMARY KEY,
+    workspace_id INTEGER NOT NULL REFERENCES workspaces(id),
+    nome TEXT NOT NULL,
+    descricao TEXT NOT NULL DEFAULT '',
+    versao TEXT NOT NULL DEFAULT '1',
+    criado_em TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+  CREATE TABLE IF NOT EXISTS protocol_sections (
+    id INTEGER PRIMARY KEY,
+    protocol_id INTEGER NOT NULL REFERENCES protocols(id),
+    ordem INTEGER NOT NULL DEFAULT 0,
+    titulo TEXT NOT NULL
+  );
+  -- tipo: texto | textarea | numero | single_select | multi_select | tabela
+  -- opcoes: JSON — array de strings (selects) ou {linhas:[{key,label}], colunas:[{key,label,tipo,opcoes?}]} (tabela)
+  CREATE TABLE IF NOT EXISTS protocol_fields (
+    id INTEGER PRIMARY KEY,
+    section_id INTEGER NOT NULL REFERENCES protocol_sections(id),
+    ordem INTEGER NOT NULL DEFAULT 0,
+    chave TEXT NOT NULL,
+    label TEXT NOT NULL,
+    tipo TEXT NOT NULL CHECK (tipo IN ('texto','textarea','numero','single_select','multi_select','tabela')),
+    opcoes TEXT NOT NULL DEFAULT 'null'
+  );
+  -- Aplicação de um protocolo a um cliente (pode repetir o mesmo protocolo
+  -- várias vezes ao longo do acompanhamento, para comparar evolução).
+  CREATE TABLE IF NOT EXISTS protocol_assignments (
+    id INTEGER PRIMARY KEY,
+    workspace_id INTEGER NOT NULL REFERENCES workspaces(id),
+    client_id INTEGER NOT NULL REFERENCES clients(id),
+    protocol_id INTEGER NOT NULL REFERENCES protocols(id),
+    data_aplicacao TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'em_andamento' CHECK (status IN ('em_andamento','concluido')),
+    criado_por TEXT NOT NULL DEFAULT '',
+    criado_em TEXT NOT NULL DEFAULT (datetime('now')),
+    atualizado_em TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+  -- valor: JSON — string/número (texto/numero/single_select), array de
+  -- strings (multi_select), ou objeto linha->coluna->valor (tabela).
+  CREATE TABLE IF NOT EXISTS protocol_responses (
+    id INTEGER PRIMARY KEY,
+    assignment_id INTEGER NOT NULL REFERENCES protocol_assignments(id),
+    field_id INTEGER NOT NULL REFERENCES protocol_fields(id),
+    valor TEXT NOT NULL DEFAULT 'null',
+    UNIQUE (assignment_id, field_id)
   );
   `);
 }

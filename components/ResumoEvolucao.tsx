@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Markdown from "./Markdown";
 
 /** O botão "uau": lê conversas + linha do tempo e devolve uma síntese para a mentora. */
 export default function ResumoEvolucao({ clienteId }: { clienteId: number }) {
@@ -32,8 +33,8 @@ export default function ResumoEvolucao({ clienteId }: { clienteId: number }) {
       </button>
       {erro && <p className="mt-2 text-[13px] text-red-600">{erro}</p>}
       {resumo && (
-        <div className="mt-3 rounded-2xl border border-[var(--leaf)]/30 bg-[var(--leaf)]/5 p-4 text-sm leading-relaxed whitespace-pre-wrap">
-          {resumo}
+        <div className="mt-3 rounded-2xl border border-[var(--leaf)]/30 bg-[var(--leaf)]/5 p-4 text-sm leading-relaxed">
+          <Markdown>{resumo}</Markdown>
         </div>
       )}
     </div>

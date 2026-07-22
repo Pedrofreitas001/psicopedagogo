@@ -91,7 +91,7 @@ create table events (
   id bigint generated always as identity primary key,
   workspace_id bigint not null references workspaces(id),
   client_id bigint not null references clients(id),
-  tipo text not null check (tipo in ('conversa','material','observacao','resumo','sessao')),
+  tipo text not null check (tipo in ('conversa','material','observacao','resumo','sessao','protocolo')),
   descricao text not null,
   criado_em timestamptz not null default now()
 );
@@ -115,8 +115,64 @@ create table agent_settings (
   usa_metodologia boolean not null default true,
   usa_historico boolean not null default true,
   usa_prontuario boolean not null default true,
+  usa_protocolos boolean not null default true,
   instrucoes_extra text not null default '',
-  tom text not null default 'acolhedor'
+  tom text not null default 'acolhedor',
+  modelo text not null default ''
+);
+
+-- Protocolos: modelo (template) de avaliação/atividade estruturada, com
+-- seções e campos — reutilizável para qualquer protocolo internalizado.
+create table protocols (
+  id bigint generated always as identity primary key,
+  workspace_id bigint not null references workspaces(id),
+  nome text not null,
+  descricao text not null default '',
+  versao text not null default '1',
+  criado_em timestamptz not null default now()
+);
+
+create table protocol_sections (
+  id bigint generated always as identity primary key,
+  protocol_id bigint not null references protocols(id),
+  ordem integer not null default 0,
+  titulo text not null
+);
+
+-- tipo: texto | textarea | numero | single_select | multi_select | tabela
+-- opcoes: jsonb — array de strings (selects) ou {linhas:[{key,label}], colunas:[{key,label,tipo,opcoes?}]} (tabela)
+create table protocol_fields (
+  id bigint generated always as identity primary key,
+  section_id bigint not null references protocol_sections(id),
+  ordem integer not null default 0,
+  chave text not null,
+  label text not null,
+  tipo text not null check (tipo in ('texto','textarea','numero','single_select','multi_select','tabela')),
+  opcoes jsonb not null default 'null'
+);
+
+-- Aplicação de um protocolo a um cliente (pode repetir o mesmo protocolo
+-- várias vezes ao longo do acompanhamento, para comparar evolução).
+create table protocol_assignments (
+  id bigint generated always as identity primary key,
+  workspace_id bigint not null references workspaces(id),
+  client_id bigint not null references clients(id),
+  protocol_id bigint not null references protocols(id),
+  data_aplicacao date not null,
+  status text not null default 'em_andamento' check (status in ('em_andamento','concluido')),
+  criado_por text not null default '',
+  criado_em timestamptz not null default now(),
+  atualizado_em timestamptz not null default now()
+);
+
+-- valor: jsonb — string/número (texto/numero/single_select), array de
+-- strings (multi_select), ou objeto linha->coluna->valor (tabela).
+create table protocol_responses (
+  id bigint generated always as identity primary key,
+  assignment_id bigint not null references protocol_assignments(id),
+  field_id bigint not null references protocol_fields(id),
+  valor jsonb not null default 'null',
+  unique (assignment_id, field_id)
 );
 
 -- ---------------------------------------------------------------------------
@@ -133,6 +189,11 @@ alter table messages enable row level security;
 alter table events enable row level security;
 alter table session_notes enable row level security;
 alter table agent_settings enable row level security;
+alter table protocols enable row level security;
+alter table protocol_sections enable row level security;
+alter table protocol_fields enable row level security;
+alter table protocol_assignments enable row level security;
+alter table protocol_responses enable row level security;
 
 create or replace function current_app_user_id() returns bigint
 language sql stable security definer as
@@ -157,6 +218,11 @@ create policy mentora_all_messages on messages for all using (is_mentora());
 create policy mentora_all_events on events for all using (is_mentora());
 create policy mentora_all_session_notes on session_notes for all using (is_mentora());
 create policy mentora_all_agent_settings on agent_settings for all using (is_mentora());
+create policy mentora_all_protocols on protocols for all using (is_mentora());
+create policy mentora_all_protocol_sections on protocol_sections for all using (is_mentora());
+create policy mentora_all_protocol_fields on protocol_fields for all using (is_mentora());
+create policy mentora_all_protocol_assignments on protocol_assignments for all using (is_mentora());
+create policy mentora_all_protocol_responses on protocol_responses for all using (is_mentora());
 
 -- Cliente: apenas o que é dele + biblioteca compartilhada
 create policy cliente_self on users for select using (auth_id = auth.uid());

@@ -73,13 +73,15 @@ registro; primeiro login real do workspace vira **mentora**; demais viram client
 
 - **Projeto novo**: rode `supabase/schema.sql` inteiro no SQL Editor.
 - **Projeto que já rodou uma versão anterior deste schema**: rode `supabase/migration_v1.sql`
-  em vez disso — só adiciona o que falta (ficha de cliente elaborada, checagem de documento,
-  prontuário, escopo do assistente), sem recriar nada.
+  e depois `supabase/migration_v2.sql`, na ordem — cada um só adiciona o que falta (v1: ficha
+  de cliente elaborada, checagem de documento, prontuário, escopo do assistente; v2: modelo de
+  IA editável e o módulo de Protocolos), sem recriar nada.
 
 ## Como o assistente se mantém fundamentado
 
 1. **Escopo**: em Configurações, a mentora liga/desliga cada fonte (metodologia, biblioteca,
-   histórico, prontuário) e define tom + instruções adicionais.
+   histórico, prontuário, protocolos), define tom + instruções adicionais e pode escolher o
+   modelo de IA usado (padrão: Claude Sonnet 5 via OpenRouter).
 2. **Recuperação**: a pergunta é tokenizada (sem acentos/stopwords) e pontuada contra as
    fontes ligadas (`lib/assistente.ts`). Documentos só entram se tiverem conteúdo **e**
    estiverem marcados como disponíveis (a checagem da Biblioteca).
@@ -118,7 +120,7 @@ lib/            lógica de domínio
 app/api/        rotas finas: validam, aplicam permissão, chamam lib/data.ts
 app/(app)/      páginas por papel (dashboard, materiais, biblioteca, clientes…)
 components/     UI reutilizável (chat, upload, prontuário, biblioteca interativa…)
-supabase/       schema.sql (instalação nova) + migration_v1.sql (projeto existente)
+supabase/       schema.sql (instalação nova) + migration_v1.sql + migration_v2.sql (projeto existente)
 ```
 
 Toda leitura/escrita passa por `lib/data.ts`, que decide o backend: Postgres do Supabase via

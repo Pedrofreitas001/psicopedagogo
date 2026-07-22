@@ -8,15 +8,28 @@ export type Settings = {
   usaMetodologia: boolean;
   usaHistorico: boolean;
   usaProntuario: boolean;
+  usaProtocolos: boolean;
   instrucoesExtra: string;
   tom: "acolhedor" | "formal" | "direto";
+  modelo: string;
 };
 
-const TOGGLES: { key: keyof Pick<Settings, "usaBiblioteca" | "usaMetodologia" | "usaHistorico" | "usaProntuario">; label: string; descricao: string }[] = [
+const TOGGLES: {
+  key: keyof Pick<Settings, "usaBiblioteca" | "usaMetodologia" | "usaHistorico" | "usaProntuario" | "usaProtocolos">;
+  label: string;
+  descricao: string;
+}[] = [
   { key: "usaMetodologia", label: "Metodologia", descricao: "As notas cadastradas aqui em Configurações." },
   { key: "usaBiblioteca", label: "Biblioteca", descricao: "Documentos publicados e marcados como disponíveis." },
   { key: "usaHistorico", label: "Histórico", descricao: "Objetivo, observações e linha do tempo do cliente." },
   { key: "usaProntuario", label: "Prontuário", descricao: "Notas de sessão datadas de cada cliente." },
+  { key: "usaProtocolos", label: "Protocolos", descricao: "Protocolos aplicados a cada cliente e seus resultados." },
+];
+
+const MODELOS_SUGERIDOS = [
+  { id: "anthropic/claude-sonnet-5", label: "Claude Sonnet 5" },
+  { id: "openai/gpt-5.6-terra", label: "GPT-5.6" },
+  { id: "google/gemini-3.5-flash", label: "Gemini 3.5 Flash" },
 ];
 
 type TesteResultado = { ok: boolean; modelo?: string; resposta?: string; error?: string };
@@ -77,6 +90,31 @@ export default function AgentSettingsForm({ inicial }: { inicial: Settings }) {
             <option value="formal">Formal — profissional e técnico</option>
             <option value="direto">Direto — objetivo, sem rodeios</option>
           </select>
+        </label>
+        <label className="text-sm block mb-3">
+          <span className="text-[var(--ink-2)]">Modelo de IA</span>
+          <div className="mt-1.5 flex flex-wrap gap-1.5">
+            {MODELOS_SUGERIDOS.map((m) => (
+              <button
+                key={m.id}
+                type="button"
+                onClick={() => setV({ ...v, modelo: m.id })}
+                className={`rounded-full border px-3 py-1 text-[12px] ${
+                  v.modelo === m.id ? "border-[var(--brand)] bg-[var(--brand)]/10 text-[var(--brand-deep)] font-medium" : "border-black/10 bg-white hover:bg-black/4"
+                }`}
+              >
+                {m.label}
+              </button>
+            ))}
+          </div>
+          <input
+            type="text"
+            value={v.modelo}
+            onChange={(e) => setV({ ...v, modelo: e.target.value })}
+            placeholder="ID do modelo na OpenRouter, ex.: anthropic/claude-sonnet-5"
+            className="mt-1.5 w-full rounded-lg border border-black/10 bg-white px-2.5 py-2 text-sm font-mono"
+          />
+          <p className="mt-1 text-[11.5px] text-[var(--ink-muted)]">Deixe em branco para usar o padrão do servidor.</p>
         </label>
         <label className="text-sm block">
           <span className="text-[var(--ink-2)]">Instruções adicionais (opcional)</span>

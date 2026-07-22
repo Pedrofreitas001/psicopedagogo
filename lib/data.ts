@@ -1,5 +1,6 @@
 import { getDb } from "./db";
 import { supabaseUrl } from "./supabase-auth";
+import { PROTOCOLOS_BUILTIN, type CampoTipo, type TabelaConfig } from "./protocolos-builtin";
 
 /**
  * Camada de dados única e assíncrona para toda a aplicação.
@@ -128,9 +129,35 @@ export type AgentSettings = {
   usaMetodologia: boolean;
   usaHistorico: boolean;
   usaProntuario: boolean;
+  usaProtocolos: boolean;
   instrucoesExtra: string;
   tom: "acolhedor" | "formal" | "direto";
+  modelo: string;
 };
+
+// ---------------------------------------------------------------------------
+// Protocolos
+// ---------------------------------------------------------------------------
+
+export type ProtocolField = { id: number; chave: string; label: string; tipo: CampoTipo; opcoes: string[] | TabelaConfig | null };
+export type ProtocolSection = { id: number; titulo: string; campos: ProtocolField[] };
+export type Protocol = { id: number; nome: string; descricao: string; versao: string; secoes: ProtocolSection[] };
+export type ProtocolSummary = { id: number; nome: string; descricao: string; versao: string };
+
+export type ProtocolAssignment = {
+  id: number;
+  clientId: number;
+  protocolId: number;
+  protocolNome: string;
+  dataAplicacao: string;
+  status: "em_andamento" | "concluido";
+  criadoPor: string;
+  criadoEm: string;
+  atualizadoEm: string;
+};
+
+export type ProtocolResponseValue = string | number | string[] | Record<string, Record<string, string | number>> | null;
+export type ProtocolResponse = { fieldId: number; valor: ProtocolResponseValue };
 
 // ---------------------------------------------------------------------------
 // Usuários & sessão
@@ -618,7 +645,7 @@ export async function listClientEvents(clientId: number, limit: number): Promise
     .all(clientId, limit) as EventRow[];
 }
 
-export async function logEvent(clientId: number, tipo: "conversa" | "material" | "observacao" | "resumo" | "sessao", descricao: string): Promise<void> {
+export async function logEvent(clientId: number, tipo: "conversa" | "material" | "observacao" | "resumo" | "sessao" | "protocolo", descricao: string): Promise<void> {
   if (postgresEnabled()) {
     await pgInsert("events", { workspace_id: 1, client_id: clientId, tipo, descricao });
     return;
@@ -755,8 +782,10 @@ const DEFAULT_AGENT_SETTINGS: AgentSettings = {
   usaMetodologia: true,
   usaHistorico: true,
   usaProntuario: true,
+  usaProtocolos: true,
   instrucoesExtra: "",
   tom: "acolhedor",
+  modelo: "",
 };
 
 export async function getAgentSettings(): Promise<AgentSettings> {
@@ -766,9 +795,11 @@ export async function getAgentSettings(): Promise<AgentSettings> {
       usa_metodologia: unknown;
       usa_historico: unknown;
       usa_prontuario: unknown;
+      usa_protocolos: unknown;
       instrucoes_extra: string;
       tom: string;
-    }>("agent_settings", "select=usa_biblioteca,usa_metodologia,usa_historico,usa_prontuario,instrucoes_extra,tom&workspace_id=eq.1&limit=1");
+      modelo: string;
+    }>("agent_settings", "select=usa_biblioteca,usa_metodologia,usa_historico,usa_prontuario,usa_protocolos,instrucoes_extra,tom,modelo&workspace_id=eq.1&limit=1");
     if (rows.length === 0) {
       await pgInsert("agent_settings", { workspace_id: 1 });
       return DEFAULT_AGENT_SETTINGS;
@@ -779,14 +810,18 @@ export async function getAgentSettings(): Promise<AgentSettings> {
       usaMetodologia: b(r.usa_metodologia),
       usaHistorico: b(r.usa_historico),
       usaProntuario: b(r.usa_prontuario),
+      usaProtocolos: r.usa_protocolos === null || r.usa_protocolos === undefined ? true : b(r.usa_protocolos),
       instrucoesExtra: r.instrucoes_extra ?? "",
       tom: (r.tom as AgentSettings["tom"]) ?? "acolhedor",
+      modelo: r.modelo ?? "",
     };
   }
   const db = getDb();
   const row = db
-    .prepare("SELECT usa_biblioteca, usa_metodologia, usa_historico, usa_prontuario, instrucoes_extra, tom FROM agent_settings WHERE workspace_id = 1 LIMIT 1")
-    .get() as { usa_biblioteca: number; usa_metodologia: number; usa_historico: number; usa_prontuario: number; instrucoes_extra: string; tom: string } | undefined;
+    .prepare("SELECT usa_biblioteca, usa_metodologia, usa_historico, usa_prontuario, usa_protocolos, instrucoes_extra, tom, modelo FROM agent_settings WHERE workspace_id = 1 LIMIT 1")
+    .get() as
+    | { usa_biblioteca: number; usa_metodologia: number; usa_historico: number; usa_prontuario: number; usa_protocolos: number; instrucoes_extra: string; tom: string; modelo: string }
+    | undefined;
   if (!row) {
     db.prepare("INSERT INTO agent_settings (workspace_id) VALUES (1)").run();
     return DEFAULT_AGENT_SETTINGS;
@@ -796,8 +831,10 @@ export async function getAgentSettings(): Promise<AgentSettings> {
     usaMetodologia: !!row.usa_metodologia,
     usaHistorico: !!row.usa_historico,
     usaProntuario: !!row.usa_prontuario,
+    usaProtocolos: !!row.usa_protocolos,
     instrucoesExtra: row.instrucoes_extra ?? "",
     tom: (row.tom as AgentSettings["tom"]) ?? "acolhedor",
+    modelo: row.modelo ?? "",
   };
 }
 
@@ -807,14 +844,332 @@ export async function updateAgentSettings(input: AgentSettings): Promise<void> {
     usa_metodologia: input.usaMetodologia,
     usa_historico: input.usaHistorico,
     usa_prontuario: input.usaProntuario,
+    usa_protocolos: input.usaProtocolos,
     instrucoes_extra: input.instrucoesExtra,
     tom: input.tom,
+    modelo: input.modelo ?? "",
   };
   if (postgresEnabled()) {
     await pgRequest(`/agent_settings?workspace_id=eq.1`, { method: "PATCH", body: JSON.stringify(body) });
     return;
   }
   getDb()
-    .prepare("UPDATE agent_settings SET usa_biblioteca=?, usa_metodologia=?, usa_historico=?, usa_prontuario=?, instrucoes_extra=?, tom=? WHERE workspace_id = 1")
-    .run(body.usa_biblioteca ? 1 : 0, body.usa_metodologia ? 1 : 0, body.usa_historico ? 1 : 0, body.usa_prontuario ? 1 : 0, body.instrucoes_extra, body.tom);
+    .prepare(
+      "UPDATE agent_settings SET usa_biblioteca=?, usa_metodologia=?, usa_historico=?, usa_prontuario=?, usa_protocolos=?, instrucoes_extra=?, tom=?, modelo=? WHERE workspace_id = 1"
+    )
+    .run(
+      body.usa_biblioteca ? 1 : 0,
+      body.usa_metodologia ? 1 : 0,
+      body.usa_historico ? 1 : 0,
+      body.usa_prontuario ? 1 : 0,
+      body.usa_protocolos ? 1 : 0,
+      body.instrucoes_extra,
+      body.tom,
+      body.modelo
+    );
+}
+
+// ---------------------------------------------------------------------------
+// Protocolos: CRUD + sincronização dos protocolos internalizados no código
+// ---------------------------------------------------------------------------
+
+export async function listProtocolSummaries(): Promise<ProtocolSummary[]> {
+  if (postgresEnabled()) {
+    const rows = await pgSelect<{ id: unknown; nome: string; descricao: string; versao: string }>(
+      "protocols",
+      "select=id,nome,descricao,versao&workspace_id=eq.1&order=nome.asc"
+    );
+    return rows.map((r) => ({ id: n(r.id), nome: r.nome, descricao: r.descricao, versao: r.versao }));
+  }
+  return getDb().prepare("SELECT id, nome, descricao, versao FROM protocols WHERE workspace_id = 1 ORDER BY nome").all() as ProtocolSummary[];
+}
+
+export async function getProtocol(id: number): Promise<Protocol | null> {
+  if (postgresEnabled()) {
+    const rows = await pgSelect<{ id: unknown; nome: string; descricao: string; versao: string }>(
+      "protocols",
+      `select=id,nome,descricao,versao&id=eq.${id}&workspace_id=eq.1&limit=1`
+    );
+    if (rows.length === 0) return null;
+    const secoes = await pgSelect<{ id: unknown; titulo: string; ordem: unknown }>(
+      "protocol_sections",
+      `select=id,titulo,ordem&protocol_id=eq.${id}&order=ordem.asc`
+    );
+    const secaoIds = secoes.map((s) => n(s.id));
+    const campos = secaoIds.length
+      ? await pgSelect<{ id: unknown; section_id: unknown; chave: string; label: string; tipo: CampoTipo; opcoes: string; ordem: unknown }>(
+          "protocol_fields",
+          `select=id,section_id,chave,label,tipo,opcoes,ordem&section_id=in.(${secaoIds.join(",")})&order=ordem.asc`
+        )
+      : [];
+    return {
+      id: n(rows[0].id),
+      nome: rows[0].nome,
+      descricao: rows[0].descricao,
+      versao: rows[0].versao,
+      secoes: secoes.map((s) => ({
+        id: n(s.id),
+        titulo: s.titulo,
+        campos: campos
+          .filter((c) => n(c.section_id) === n(s.id))
+          .map((c) => ({ id: n(c.id), chave: c.chave, label: c.label, tipo: c.tipo, opcoes: c.opcoes ? JSON.parse(c.opcoes) : null })),
+      })),
+    };
+  }
+  const db = getDb();
+  const row = db.prepare("SELECT id, nome, descricao, versao FROM protocols WHERE id = ? AND workspace_id = 1").get(id) as
+    | { id: number; nome: string; descricao: string; versao: string }
+    | undefined;
+  if (!row) return null;
+  const secoes = db.prepare("SELECT id, titulo FROM protocol_sections WHERE protocol_id = ? ORDER BY ordem").all(id) as { id: number; titulo: string }[];
+  return {
+    ...row,
+    secoes: secoes.map((s) => ({
+      id: s.id,
+      titulo: s.titulo,
+      campos: (
+        db.prepare("SELECT id, chave, label, tipo, opcoes FROM protocol_fields WHERE section_id = ? ORDER BY ordem").all(s.id) as {
+          id: number;
+          chave: string;
+          label: string;
+          tipo: CampoTipo;
+          opcoes: string;
+        }[]
+      ).map((c) => ({ id: c.id, chave: c.chave, label: c.label, tipo: c.tipo, opcoes: c.opcoes ? JSON.parse(c.opcoes) : null })),
+    })),
+  };
+}
+
+async function createProtocol(def: (typeof PROTOCOLOS_BUILTIN)[number]): Promise<void> {
+  if (postgresEnabled()) {
+    const protocol = await pgInsert<{ id: unknown }>("protocols", { workspace_id: 1, nome: def.nome, descricao: def.descricao, versao: def.versao });
+    const protocolId = n(protocol.id);
+    for (let i = 0; i < def.secoes.length; i++) {
+      const secao = def.secoes[i];
+      const s = await pgInsert<{ id: unknown }>("protocol_sections", { protocol_id: protocolId, ordem: i, titulo: secao.titulo });
+      const sectionId = n(s.id);
+      for (let j = 0; j < secao.campos.length; j++) {
+        const campo = secao.campos[j];
+        await pgInsert("protocol_fields", {
+          section_id: sectionId,
+          ordem: j,
+          chave: campo.chave,
+          label: campo.label,
+          tipo: campo.tipo,
+          opcoes: JSON.stringify(campo.opcoes ?? null),
+        });
+      }
+    }
+    return;
+  }
+  const db = getDb();
+  const tx = db.transaction(() => {
+    const protocolId = Number(
+      db.prepare("INSERT INTO protocols (workspace_id, nome, descricao, versao) VALUES (1, ?, ?, ?)").run(def.nome, def.descricao, def.versao)
+        .lastInsertRowid
+    );
+    def.secoes.forEach((secao, i) => {
+      const sectionId = Number(
+        db.prepare("INSERT INTO protocol_sections (protocol_id, ordem, titulo) VALUES (?, ?, ?)").run(protocolId, i, secao.titulo).lastInsertRowid
+      );
+      secao.campos.forEach((campo, j) => {
+        db.prepare("INSERT INTO protocol_fields (section_id, ordem, chave, label, tipo, opcoes) VALUES (?, ?, ?, ?, ?, ?)").run(
+          sectionId,
+          j,
+          campo.chave,
+          campo.label,
+          campo.tipo,
+          JSON.stringify(campo.opcoes ?? null)
+        );
+      });
+    });
+  });
+  tx();
+}
+
+/** Idempotente por nome — roda sempre que a lista de protocolos é aberta; cria os que faltam, não mexe nos existentes. */
+export async function syncBuiltinProtocols(): Promise<void> {
+  const existentes = await listProtocolSummaries();
+  const nomesExistentes = new Set(existentes.map((p) => p.nome));
+  for (const def of PROTOCOLOS_BUILTIN) {
+    if (!nomesExistentes.has(def.nome)) await createProtocol(def);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Protocolos: aplicações (assignments) e respostas por cliente
+// ---------------------------------------------------------------------------
+
+function mapAssignment(r: {
+  id: unknown;
+  client_id: unknown;
+  protocol_id: unknown;
+  protocol_nome?: string;
+  data_aplicacao: string;
+  status: "em_andamento" | "concluido";
+  criado_por: string;
+  criado_em: string;
+  atualizado_em: string;
+}): ProtocolAssignment {
+  return {
+    id: n(r.id),
+    clientId: n(r.client_id),
+    protocolId: n(r.protocol_id),
+    protocolNome: r.protocol_nome ?? "",
+    dataAplicacao: r.data_aplicacao,
+    status: r.status,
+    criadoPor: r.criado_por,
+    criadoEm: r.criado_em,
+    atualizadoEm: r.atualizado_em,
+  };
+}
+
+export async function listClientAssignments(clientId: number): Promise<ProtocolAssignment[]> {
+  const protocolos = await listProtocolSummaries();
+  const nomeById = new Map(protocolos.map((p) => [p.id, p.nome]));
+  if (postgresEnabled()) {
+    const rows = await pgSelect<{
+      id: unknown;
+      client_id: unknown;
+      protocol_id: unknown;
+      data_aplicacao: string;
+      status: "em_andamento" | "concluido";
+      criado_por: string;
+      criado_em: string;
+      atualizado_em: string;
+    }>(
+      "protocol_assignments",
+      `select=id,client_id,protocol_id,data_aplicacao,status,criado_por,criado_em,atualizado_em&client_id=eq.${clientId}&order=data_aplicacao.desc`
+    );
+    return rows.map((r) => mapAssignment({ ...r, protocol_nome: nomeById.get(n(r.protocol_id)) }));
+  }
+  const rows = getDb()
+    .prepare(
+      "SELECT id, client_id, protocol_id, data_aplicacao, status, criado_por, criado_em, atualizado_em FROM protocol_assignments WHERE client_id = ? ORDER BY data_aplicacao DESC"
+    )
+    .all(clientId) as {
+    id: number;
+    client_id: number;
+    protocol_id: number;
+    data_aplicacao: string;
+    status: "em_andamento" | "concluido";
+    criado_por: string;
+    criado_em: string;
+    atualizado_em: string;
+  }[];
+  return rows.map((r) => mapAssignment({ ...r, protocol_nome: nomeById.get(r.protocol_id) }));
+}
+
+export async function getAssignment(id: number): Promise<ProtocolAssignment | null> {
+  const all = await pgOrDbSelectAssignment(id);
+  if (!all) return null;
+  const protocolos = await listProtocolSummaries();
+  const nome = protocolos.find((p) => p.id === all.protocolId)?.nome ?? "";
+  return { ...all, protocolNome: nome };
+}
+
+async function pgOrDbSelectAssignment(id: number): Promise<ProtocolAssignment | null> {
+  if (postgresEnabled()) {
+    const rows = await pgSelect<{
+      id: unknown;
+      client_id: unknown;
+      protocol_id: unknown;
+      data_aplicacao: string;
+      status: "em_andamento" | "concluido";
+      criado_por: string;
+      criado_em: string;
+      atualizado_em: string;
+    }>(
+      "protocol_assignments",
+      `select=id,client_id,protocol_id,data_aplicacao,status,criado_por,criado_em,atualizado_em&id=eq.${id}&limit=1`
+    );
+    return rows[0] ? mapAssignment(rows[0]) : null;
+  }
+  const row = getDb()
+    .prepare("SELECT id, client_id, protocol_id, data_aplicacao, status, criado_por, criado_em, atualizado_em FROM protocol_assignments WHERE id = ?")
+    .get(id) as
+    | {
+        id: number;
+        client_id: number;
+        protocol_id: number;
+        data_aplicacao: string;
+        status: "em_andamento" | "concluido";
+        criado_por: string;
+        criado_em: string;
+        atualizado_em: string;
+      }
+    | undefined;
+  return row ? mapAssignment(row) : null;
+}
+
+export async function createAssignment(input: { clientId: number; protocolId: number; dataAplicacao: string; criadoPor: string }): Promise<number> {
+  if (postgresEnabled()) {
+    const row = await pgInsert<{ id: unknown }>("protocol_assignments", {
+      workspace_id: 1,
+      client_id: input.clientId,
+      protocol_id: input.protocolId,
+      data_aplicacao: input.dataAplicacao,
+      criado_por: input.criadoPor,
+    });
+    return n(row.id);
+  }
+  const info = getDb()
+    .prepare("INSERT INTO protocol_assignments (workspace_id, client_id, protocol_id, data_aplicacao, criado_por) VALUES (1, ?, ?, ?, ?)")
+    .run(input.clientId, input.protocolId, input.dataAplicacao, input.criadoPor);
+  return Number(info.lastInsertRowid);
+}
+
+export async function updateAssignmentStatus(id: number, status: "em_andamento" | "concluido"): Promise<void> {
+  if (postgresEnabled()) {
+    await pgRequest(`/protocol_assignments?id=eq.${id}`, { method: "PATCH", body: JSON.stringify({ status, atualizado_em: new Date().toISOString() }) });
+    return;
+  }
+  getDb().prepare("UPDATE protocol_assignments SET status = ?, atualizado_em = datetime('now') WHERE id = ?").run(status, id);
+}
+
+export async function deleteAssignment(id: number): Promise<void> {
+  if (postgresEnabled()) {
+    await pgRequest(`/protocol_responses?assignment_id=eq.${id}`, { method: "DELETE" });
+    await pgRequest(`/protocol_assignments?id=eq.${id}`, { method: "DELETE" });
+    return;
+  }
+  const db = getDb();
+  db.prepare("DELETE FROM protocol_responses WHERE assignment_id = ?").run(id);
+  db.prepare("DELETE FROM protocol_assignments WHERE id = ?").run(id);
+}
+
+export async function getResponses(assignmentId: number): Promise<ProtocolResponse[]> {
+  if (postgresEnabled()) {
+    const rows = await pgSelect<{ field_id: unknown; valor: string }>("protocol_responses", `select=field_id,valor&assignment_id=eq.${assignmentId}`);
+    return rows.map((r) => ({ fieldId: n(r.field_id), valor: r.valor ? JSON.parse(r.valor) : null }));
+  }
+  const rows = getDb().prepare("SELECT field_id, valor FROM protocol_responses WHERE assignment_id = ?").all(assignmentId) as {
+    field_id: number;
+    valor: string;
+  }[];
+  return rows.map((r) => ({ fieldId: r.field_id, valor: r.valor ? JSON.parse(r.valor) : null }));
+}
+
+export async function saveResponses(assignmentId: number, respostas: ProtocolResponse[]): Promise<void> {
+  if (postgresEnabled()) {
+    for (const r of respostas) {
+      await pgRequest(`/protocol_responses`, {
+        method: "POST",
+        headers: { Prefer: "resolution=merge-duplicates" },
+        body: JSON.stringify({ assignment_id: assignmentId, field_id: r.fieldId, valor: JSON.stringify(r.valor) }),
+      });
+    }
+    await pgRequest(`/protocol_assignments?id=eq.${assignmentId}`, { method: "PATCH", body: JSON.stringify({ atualizado_em: new Date().toISOString() }) });
+    return;
+  }
+  const db = getDb();
+  const tx = db.transaction(() => {
+    for (const r of respostas) {
+      db.prepare(
+        "INSERT INTO protocol_responses (assignment_id, field_id, valor) VALUES (?, ?, ?) ON CONFLICT(assignment_id, field_id) DO UPDATE SET valor = excluded.valor"
+      ).run(assignmentId, r.fieldId, JSON.stringify(r.valor));
+    }
+    db.prepare("UPDATE protocol_assignments SET atualizado_em = datetime('now') WHERE id = ?").run(assignmentId);
+  });
+  tx();
 }

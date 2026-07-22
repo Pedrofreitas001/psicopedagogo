@@ -1,13 +1,14 @@
 "use client";
 
 import { useRef, useState } from "react";
+import Markdown from "./Markdown";
 
 type Fonte = { tipo: string; titulo: string };
 type Msg =
   | { papel: "usuario"; texto: string }
   | { papel: "assistente"; texto: string; fontes: Fonte[]; recusado: boolean };
 
-const ROTULO_FONTE: Record<string, string> = { documento: "📄", metodologia: "🧭", historico: "🕰️", prontuario: "🗒️" };
+const ROTULO_FONTE: Record<string, string> = { documento: "📄", metodologia: "🧭", historico: "🕰️", prontuario: "🗒️", protocolo: "🧩" };
 
 export default function ChatAssistente({
   clientes,
@@ -101,11 +102,11 @@ export default function ChatAssistente({
           ) : (
             <div key={idx} className="max-w-[92%] space-y-2">
               <div
-                className={`rounded-2xl rounded-bl-sm border px-4 py-3 text-sm leading-relaxed whitespace-pre-wrap ${
+                className={`rounded-2xl rounded-bl-sm border px-4 py-3 text-sm leading-relaxed ${
                   msg.recusado ? "border-amber-300 bg-amber-50" : "border-black/8 bg-[var(--surface-1)]"
                 }`}
               >
-                {msg.texto}
+                <Markdown>{msg.texto}</Markdown>
               </div>
               {msg.fontes.length > 0 && (
                 <div className="flex flex-wrap gap-1.5 text-[11.5px] text-[var(--ink-muted)]">

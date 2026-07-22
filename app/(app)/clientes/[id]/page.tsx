@@ -1,5 +1,5 @@
 import { notFound, redirect } from "next/navigation";
-import { getClient, listClientDocuments, listClientEvents, listSessionNotes } from "@/lib/data";
+import { getClient, listClientDocuments, listClientEvents, listSessionNotes, listClientAssignments } from "@/lib/data";
 import { getCurrentUser } from "@/lib/auth";
 import ClienteForm from "@/components/ClienteForm";
 import ResumoEvolucao from "@/components/ResumoEvolucao";
@@ -7,6 +7,7 @@ import Historico from "@/components/Historico";
 import UploadForm from "@/components/UploadForm";
 import ChatAssistente from "@/components/ChatAssistente";
 import SessionNotes from "@/components/SessionNotes";
+import ProtocolosCliente from "@/components/ProtocolosCliente";
 
 const ICONE: Record<string, string> = { pdf: "📕", docx: "📘", doc: "📘", pptx: "📙", ppt: "📙", xlsx: "📗", xls: "📗" };
 
@@ -28,10 +29,11 @@ export default async function ClientePage({ params }: { params: Promise<{ id: st
   const cliente = await getClient(clientId);
   if (!cliente) notFound();
 
-  const [docs, eventos, notas] = await Promise.all([
+  const [docs, eventos, notas, protocolAssignments] = await Promise.all([
     listClientDocuments(cliente.id),
     listClientEvents(cliente.id, 40),
     listSessionNotes(cliente.id),
+    listClientAssignments(cliente.id),
   ]);
 
   const secao = "rounded-2xl border border-black/8 bg-[var(--surface-1)] p-6";
@@ -91,6 +93,10 @@ export default async function ClientePage({ params }: { params: Promise<{ id: st
 
       <div className={secao}>
         <SessionNotes clienteId={cliente.id} notas={notas} />
+      </div>
+
+      <div className={secao}>
+        <ProtocolosCliente clienteId={cliente.id} assignments={protocolAssignments} />
       </div>
 
       <div className={secao}>

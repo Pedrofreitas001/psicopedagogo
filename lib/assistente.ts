@@ -11,7 +11,13 @@ import {
   createMessage,
   logEvent,
   getAgentSettings,
+  listClientAssignments,
+  getProtocol,
+  getResponses,
   type AgentSettings,
+  type Protocol,
+  type ProtocolField,
+  type ProtocolResponse,
 } from "./data";
 
 /**
@@ -20,7 +26,8 @@ import {
  *   1. a metodologia cadastrada pela mentora (tabela knowledge);
  *   2. os documentos da biblioteca e do cliente marcados como disponíveis;
  *   3. o histórico daquele cliente (objetivo/observações e linha do tempo);
- *   4. o prontuário (notas de sessão datadas).
+ *   4. o prontuário (notas de sessão datadas);
+ *   5. os protocolos aplicados ao cliente e seus resultados registrados.
  *
  * Nunca internet, nunca opinião própria, nunca diagnóstico. Quando a base
  * não sustenta uma resposta, ele diz isso com clareza.
@@ -30,7 +37,7 @@ import {
  * compõe a resposta diretamente dos trechos recuperados (modo demo, offline).
  */
 
-export type Fonte = { tipo: "documento" | "metodologia" | "historico" | "prontuario"; titulo: string };
+export type Fonte = { tipo: "documento" | "metodologia" | "historico" | "prontuario" | "protocolo"; titulo: string };
 export type RespostaAssistente = { resposta: string; fontes: Fonte[]; recusado: boolean };
 
 const STOPWORDS = new Set(
@@ -102,6 +109,20 @@ export async function recuperarBase(pergunta: string, clientId: number | null, s
     }
   }
 
+  if (clientId && settings.usaProtocolos) {
+    const assignments = await listClientAssignments(clientId);
+    for (const a of assignments.slice(0, 5)) {
+      const [protocolo, respostas] = await Promise.all([getProtocol(a.protocolId), getResponses(a.id)]);
+      if (!protocolo) continue;
+      const texto = resumirProtocolo(a.dataAplicacao, a.status, protocolo, respostas);
+      if (!texto) continue;
+      candidatos.push({
+        fonte: { tipo: "protocolo", titulo: `${protocolo.nome} — ${a.dataAplicacao.slice(0, 10).split("-").reverse().join("/")}` },
+        texto,
+      });
+    }
+  }
+
   const trechos: Trecho[] = [];
   for (const c of candidatos) {
     const t = tokens(c.texto);
@@ -165,6 +186,44 @@ function resumirTrecho(texto: string): string {
   return frases.join(" ").slice(0, 600);
 }
 
+/** Converte o preenchimento de um protocolo (respostas por campo) num texto corrido para a base de recuperação do assistente. */
+function resumirProtocolo(dataAplicacao: string, status: string, protocolo: Protocol, respostas: ProtocolResponse[]): string {
+  const porCampo = new Map(respostas.map((r) => [r.fieldId, r.valor]));
+  const partes: string[] = [`Aplicação em ${dataAplicacao.slice(0, 10).split("-").reverse().join("/")}, status: ${status === "concluido" ? "concluído" : "em andamento"}.`];
+
+  for (const secao of protocolo.secoes) {
+    const linhasSecao: string[] = [];
+    for (const campo of secao.campos) {
+      const valor = porCampo.get(campo.id);
+      const texto = formatarValorCampo(campo, valor);
+      if (texto) linhasSecao.push(`${campo.label}: ${texto}`);
+    }
+    if (linhasSecao.length) partes.push(`${secao.titulo} — ${linhasSecao.join("; ")}.`);
+  }
+  return partes.length > 1 ? partes.join(" ") : "";
+}
+
+function formatarValorCampo(campo: ProtocolField, valor: unknown): string {
+  if (valor === null || valor === undefined || valor === "") return "";
+  if (campo.tipo === "multi_select" && Array.isArray(valor)) return valor.join(", ");
+  if (campo.tipo === "tabela" && typeof valor === "object" && !Array.isArray(campo.opcoes)) {
+    const config = campo.opcoes as { linhas: { key: string; label: string }[] } | null;
+    if (!config) return "";
+    const registro = valor as Record<string, Record<string, string | number>>;
+    const linhas = config.linhas
+      .map((l) => {
+        const colunas = registro[l.key];
+        if (!colunas) return "";
+        const vals = Object.values(colunas).filter((v) => v !== null && v !== undefined && v !== "");
+        return vals.length ? `${l.label} (${vals.join(", ")})` : "";
+      })
+      .filter(Boolean);
+    return linhas.join("; ");
+  }
+  if (typeof valor === "string" || typeof valor === "number") return String(valor);
+  return "";
+}
+
 /** Junta partes de texto com ". " entre elas, sem duplicar pontuação quando uma parte já termina em ponto. */
 function juntarComPonto(partes: (string | null | undefined)[]): string {
   return partes
@@ -180,11 +239,18 @@ const TOM_INSTRUCAO: Record<AgentSettings["tom"], string> = {
   direto: "Tom: direto e objetivo, frases curtas, sem rodeios.",
 };
 
+export const MODELO_PADRAO = "anthropic/claude-sonnet-5";
+
 /** Chama um modelo via OpenRouter (API compatível com OpenAI) para redigir a resposta final. */
-async function chamarOpenRouter(system: string, messages: { role: "user" | "assistant"; content: string }[], maxTokens: number): Promise<string> {
+async function chamarOpenRouter(
+  system: string,
+  messages: { role: "user" | "assistant"; content: string }[],
+  maxTokens: number,
+  modeloEscolhido?: string
+): Promise<string> {
   const apiKey = process.env.OPENROUTER_API_KEY;
   if (!apiKey) throw new Error("OPENROUTER_API_KEY não configurada");
-  const model = process.env.OPENROUTER_MODEL || "anthropic/claude-sonnet-5";
+  const model = modeloEscolhido || process.env.OPENROUTER_MODEL || MODELO_PADRAO;
 
   const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
     method: "POST",
@@ -213,12 +279,14 @@ async function chamarOpenRouter(system: string, messages: { role: "user" | "assi
 
 /** Chamada mínima para diagnosticar a configuração da OpenRouter (usada pelo botão "Testar conexão" em Configurações). */
 export async function testarConexaoIA(): Promise<{ ok: boolean; modelo?: string; resposta?: string; error?: string }> {
-  const modelo = process.env.OPENROUTER_MODEL || "anthropic/claude-sonnet-5";
+  const settings = await getAgentSettings();
+  const modelo = settings.modelo || process.env.OPENROUTER_MODEL || MODELO_PADRAO;
   try {
     const resposta = await chamarOpenRouter(
       "Responda apenas com a palavra: ok",
       [{ role: "user", content: "teste de conexão" }],
-      20
+      20,
+      modelo
     );
     return { ok: true, modelo, resposta };
   } catch (e) {
@@ -255,7 +323,7 @@ ${contexto}`;
     { role: "user", content: pergunta },
   ];
 
-  return chamarOpenRouter(system, messages, 1024);
+  return chamarOpenRouter(system, messages, 1024, settings.modelo || undefined);
 }
 
 /** Salva a troca no banco e registra o evento na linha do tempo. */
@@ -287,6 +355,7 @@ export async function gerarResumoEvolucao(clientId: number): Promise<string> {
 
   const msgs = await listAllMessages(clientId);
   const eventos = await listClientEvents(clientId, 100);
+  const settings = await getAgentSettings();
 
   if (process.env.OPENROUTER_API_KEY && (msgs.length > 0 || eventos.length > 0)) {
     try {
@@ -308,7 +377,8 @@ export async function gerarResumoEvolucao(clientId: number): Promise<string> {
           "(linha do tempo e conversas) — nada externo. Não emita diagnóstico. Escreva 1 a 2 parágrafos em português do Brasil, tom " +
           "profissional e objetivo: avanços observados, dificuldades que persistem e sugestão de foco para os próximos encontros.",
         [{ role: "user", content: material }],
-        800
+        800,
+        settings.modelo || undefined
       );
       if (texto) return await registrarResumo(clientId, texto);
     } catch {
