@@ -14,7 +14,7 @@ export default async function AssistentePage() {
 
   return (
     <div>
-      <h1 className="text-2xl font-semibold">Assistente de Estudos</h1>
+      <h1 className="text-[26px] font-bold text-[var(--brand)]">Assistente de Estudos</h1>
       <p className="mt-1 mb-6 text-[13.5px] text-[var(--ink-muted)]">
         Responde com base nos materiais e na metodologia da mentora — e no seu acompanhamento.
       </p>

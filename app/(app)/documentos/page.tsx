@@ -14,12 +14,12 @@ export default async function DocumentosPage() {
     <div className="max-w-2xl">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold">Documentos</h1>
+          <h1 className="text-[26px] font-bold text-[var(--brand)]">Documentos</h1>
           <p className="mt-1 text-[13.5px] text-[var(--ink-muted)]">Seus arquivos e atividades — visíveis só para você e sua mentora.</p>
         </div>
         <UploadForm clientId={user.clientId} comConteudo={false} />
       </div>
-      <div className="mt-6 rounded-2xl border border-black/8 bg-[var(--surface-1)] divide-y divide-black/5">
+      <div className="mt-6 card rounded-2xl divide-y divide-black/5">
         {docs.map((d) => (
           <a key={d.id} href={`/api/documentos/${d.id}`} className="flex items-center gap-3 px-5 py-3.5 hover:bg-black/2">
             <span className="text-lg">{ICONE[d.tipo] ?? "📄"}</span>

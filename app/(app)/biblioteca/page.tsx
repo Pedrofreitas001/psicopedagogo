@@ -26,7 +26,7 @@ export default async function BibliotecaPage() {
 
   return (
     <div className="max-w-2xl">
-      <h1 className="text-2xl font-semibold">Biblioteca</h1>
+      <h1 className="text-[26px] font-bold text-[var(--brand)]">Biblioteca</h1>
       <p className="mt-1 text-[13.5px] text-[var(--ink-muted)]">
         PDF, Word, PowerPoint e Excel organizados por pastas. Revise o conteúdo de cada arquivo e disponibilize para o assistente quando estiver pronto.
       </p>
@@ -34,7 +34,7 @@ export default async function BibliotecaPage() {
         <UploadForm categorias={opcoesCategoria} />
         <NovaPasta categorias={opcoesCategoria} />
       </div>
-      <div className="mt-6 rounded-2xl border border-black/8 bg-[var(--surface-1)] p-6">
+      <div className="mt-6 card rounded-2xl p-6">
         <BibliotecaArvore cats={cats} docs={docs.map((d) => ({ id: d.id, categoriaId: d.categoriaId, nome: d.nome, tipo: d.tipo, conteudo: d.conteudo, disponivelAssistente: d.disponivelAssistente }))} />
       </div>
     </div>

@@ -10,7 +10,7 @@ export default async function HistoricoPage() {
 
   return (
     <div className="max-w-2xl">
-      <h1 className="text-2xl font-semibold">Meu Histórico</h1>
+      <h1 className="text-[26px] font-bold text-[var(--brand)]">Meu Histórico</h1>
       <p className="mt-1 text-[13.5px] text-[var(--ink-muted)]">A linha do tempo do seu acompanhamento — registrada automaticamente.</p>
       <div className="mt-6">
         <Historico eventos={eventos} />

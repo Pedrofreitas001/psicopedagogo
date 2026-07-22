@@ -52,7 +52,7 @@ export default function SessionNotes({ clienteId, notas }: { clienteId: number; 
   return (
     <div>
       <div className="flex items-center justify-between">
-        <h2 className="text-[15px] font-semibold">🗒️ Prontuário — Sessões</h2>
+        <h2 className="flex items-center gap-2 text-[15px] font-semibold"><span className="material-symbols-outlined text-[20px] text-[var(--brand)]">history_edu</span> Prontuário — Sessões</h2>
         {!aberto && (
           <button onClick={() => setAberto(true)} className="rounded-lg bg-[var(--brand)] hover:bg-[var(--brand-deep)] text-white px-4 py-2 text-sm font-medium">
             + Nova nota de sessão
@@ -61,7 +61,7 @@ export default function SessionNotes({ clienteId, notas }: { clienteId: number; 
       </div>
 
       {aberto && (
-        <form onSubmit={salvar} className="mt-3 rounded-xl border border-black/8 bg-white p-4 space-y-3">
+        <form onSubmit={salvar} className="mt-3 rounded-xl border border-[var(--grid)] bg-[var(--surface-low)] p-4 space-y-3">
           <label className="text-sm block">
             <span className="text-[var(--ink-2)]">Data da sessão</span>
             <input type="date" value={data} onChange={(e) => setData(e.target.value)} required className="mt-1 rounded-lg border border-black/10 bg-white px-2.5 py-2 text-sm" />
@@ -84,7 +84,7 @@ export default function SessionNotes({ clienteId, notas }: { clienteId: number; 
 
       <div className="mt-4 space-y-3">
         {notas.map((n) => (
-          <div key={n.id} className="rounded-xl border border-black/6 bg-white p-4">
+          <div key={n.id} className="rounded-xl border border-[var(--grid)] bg-[var(--surface-low)] p-4">
             <div className="flex items-center justify-between">
               <div className="text-[13px] font-medium text-[var(--brand-deep)]">{dataBr(n.dataSessao)}</div>
               <button onClick={() => excluir(n.id)} className="text-[11.5px] text-[var(--ink-muted)] hover:text-red-600">

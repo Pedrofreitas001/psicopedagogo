@@ -55,7 +55,7 @@ export default function UploadForm({
   }
 
   return (
-    <form onSubmit={enviar} className="rounded-2xl border border-black/8 bg-[var(--surface-1)] p-5 space-y-3 max-w-lg">
+    <form onSubmit={enviar} className="card rounded-2xl p-5 space-y-3 max-w-lg">
       <label className="block text-sm">
         <span className="text-[var(--ink-2)]">Arquivo (PDF, Word, PowerPoint ou Excel)</span>
         <input

@@ -22,14 +22,23 @@ export default async function ProtocoloAplicacaoPage({ params }: { params: Promi
   return (
     <div className="max-w-3xl space-y-6">
       <div>
-        <Link href={`/clientes/${cliente.id}`} className="text-[13px] text-[var(--ink-muted)] hover:text-[var(--brand-deep)]">
-          ← {cliente.nome}
+        <Link href={`/clientes/${cliente.id}`} className="inline-flex items-center gap-1 text-[13px] text-[var(--ink-muted)] hover:text-[var(--brand)]">
+          <span className="material-symbols-outlined text-[16px]">arrow_back</span> {cliente.nome}
         </Link>
-        <h1 className="mt-1 text-2xl font-semibold">{protocolo.nome}</h1>
-        <p className="mt-1 text-[13px] text-[var(--ink-muted)]">
-          v{protocolo.versao} · aplicado em {assignment.dataAplicacao.slice(0, 10).split("-").reverse().join("/")} · por {assignment.criadoPor}
-        </p>
-        {protocolo.descricao && <p className="mt-2 text-[13.5px] text-[var(--ink-2)]">{protocolo.descricao}</p>}
+        <div className="mt-3 flex items-start gap-4">
+          <div className="w-14 h-14 bg-[var(--brand-container)]/15 rounded-2xl flex items-center justify-center text-[var(--brand)] shrink-0">
+            <span className="material-symbols-outlined text-[30px]">assignment</span>
+          </div>
+          <div>
+            <h1 className="text-[22px] font-bold text-[var(--brand)] leading-tight">{protocolo.nome}</h1>
+            <p className="mt-1 text-[13px] text-[var(--ink-2)]">
+              <span className="font-semibold text-[var(--leaf)]">{cliente.nome}</span>
+              <span className="mx-2 text-[var(--grid)]">•</span>
+              v{protocolo.versao} · aplicado em {assignment.dataAplicacao.slice(0, 10).split("-").reverse().join("/")} · por {assignment.criadoPor}
+            </p>
+            {protocolo.descricao && <p className="mt-1.5 text-[13px] text-[var(--ink-muted)]">{protocolo.descricao}</p>}
+          </div>
+        </div>
       </div>
 
       <ProtocolForm assignmentId={assignment.id} clientId={cliente.id} protocolo={protocolo} respostasIniciais={respostas} status={assignment.status} />

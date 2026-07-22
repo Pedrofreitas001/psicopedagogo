@@ -66,7 +66,7 @@ export default function AgentSettingsForm({ inicial }: { inicial: Settings }) {
         <p className="text-[12px] font-semibold uppercase tracking-wide text-[var(--ink-muted)] mb-2">O que o assistente acessa</p>
         <div className="grid grid-cols-2 gap-3">
           {TOGGLES.map((t) => (
-            <label key={t.key} className="flex items-start gap-2.5 rounded-xl border border-black/8 bg-white p-3 cursor-pointer">
+            <label key={t.key} className="flex items-start gap-2.5 rounded-xl border border-[var(--grid)] bg-[var(--surface-low)] p-3 cursor-pointer">
               <input type="checkbox" checked={v[t.key]} onChange={(e) => setV({ ...v, [t.key]: e.target.checked })} className="mt-0.5" />
               <span>
                 <span className="block text-[13px] font-medium">{t.label}</span>

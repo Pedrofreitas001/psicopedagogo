@@ -69,7 +69,7 @@ export default function ProtocolosCliente({ clienteId, assignments }: { clienteI
   return (
     <div>
       <div className="flex items-center justify-between">
-        <h2 className="text-[15px] font-semibold">🧩 Protocolos</h2>
+        <h2 className="flex items-center gap-2 text-[15px] font-semibold"><span className="material-symbols-outlined text-[20px] text-[var(--brand)]">fact_check</span> Protocolos</h2>
         {!aberto && (
           <button onClick={() => setAberto(true)} className="rounded-lg bg-[var(--brand)] hover:bg-[var(--brand-deep)] text-white px-4 py-2 text-sm font-medium">
             + Associar protocolo
@@ -78,7 +78,7 @@ export default function ProtocolosCliente({ clienteId, assignments }: { clienteI
       </div>
 
       {aberto && (
-        <form onSubmit={associar} className="mt-3 rounded-xl border border-black/8 bg-white p-4 space-y-3">
+        <form onSubmit={associar} className="mt-3 rounded-xl border border-[var(--grid)] bg-[var(--surface-low)] p-4 space-y-3">
           <label className="text-sm block">
             <span className="text-[var(--ink-2)]">Protocolo</span>
             {protocolos === null ? (
@@ -116,7 +116,7 @@ export default function ProtocolosCliente({ clienteId, assignments }: { clienteI
           <Link
             key={a.id}
             href={`/protocolos/${a.id}`}
-            className="flex items-center justify-between rounded-xl border border-black/6 bg-white p-4 hover:border-[var(--brand)]/40"
+            className="flex items-center justify-between rounded-xl border border-[var(--grid)] bg-[var(--surface-low)] p-4 hover:border-[var(--brand)]/40"
           >
             <div>
               <div className="text-[13.5px] font-medium">{a.protocolNome}</div>

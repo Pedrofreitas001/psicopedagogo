@@ -36,39 +36,50 @@ export default async function ClientePage({ params }: { params: Promise<{ id: st
     listClientAssignments(cliente.id),
   ]);
 
-  const secao = "rounded-2xl border border-black/8 bg-[var(--surface-1)] p-6";
+  const secao = "card rounded-2xl p-6";
+  const tituloSecao = "flex items-center gap-2 text-[15px] font-semibold";
+  const iconeSecao = "material-symbols-outlined text-[20px] text-[var(--brand)]";
 
   return (
     <div className="max-w-3xl space-y-6">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold">
-            {cliente.nome}
-            {cliente.idade ? <span className="text-[var(--ink-muted)] font-normal text-lg"> · {cliente.idade} anos</span> : null}
-          </h1>
-          <p className="mt-1 text-[13px] text-[var(--ink-muted)]">
-            {cliente.email || "sem email"} · acompanhamento desde {cliente.criadoEm.slice(0, 10).split("-").reverse().join("/")}
-          </p>
+      <div className="card rounded-2xl p-6 border-t-2 border-[var(--leaf)] flex items-start gap-5">
+        <div className="w-16 h-16 rounded-2xl bg-[var(--leaf-container)] text-[var(--leaf)] grid place-items-center text-[22px] font-bold shrink-0" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+          {cliente.nome.split(" ").slice(0, 2).map((p) => p[0]).join("").toUpperCase()}
         </div>
-        <ClienteForm
-          clienteId={cliente.id}
-          valores={{
-            nome: cliente.nome,
-            email: cliente.email,
-            idade: cliente.idade,
-            escolaSerie: cliente.escolaSerie,
-            queixaPrincipal: cliente.queixaPrincipal,
-            diagnosticoPreliminar: cliente.diagnosticoPreliminar,
-            responsavelNome: cliente.responsavelNome,
-            responsavelContato: cliente.responsavelContato,
-            objetivo: cliente.objetivo,
-            observacoes: cliente.observacoes,
-          }}
-        />
+        <div className="flex-1 min-w-0">
+          <div className="flex items-start justify-between gap-4">
+            <h1 className="text-[22px] font-bold">{cliente.nome}</h1>
+            <ClienteForm
+              clienteId={cliente.id}
+              valores={{
+                nome: cliente.nome,
+                email: cliente.email,
+                idade: cliente.idade,
+                escolaSerie: cliente.escolaSerie,
+                queixaPrincipal: cliente.queixaPrincipal,
+                diagnosticoPreliminar: cliente.diagnosticoPreliminar,
+                responsavelNome: cliente.responsavelNome,
+                responsavelContato: cliente.responsavelContato,
+                objetivo: cliente.objetivo,
+                observacoes: cliente.observacoes,
+              }}
+            />
+          </div>
+          <div className="mt-2 flex flex-wrap gap-2">
+            {cliente.idade ? (
+              <span className="px-3 py-1 bg-[var(--brand)]/10 text-[var(--brand)] rounded-full text-[12px] font-medium">{cliente.idade} anos</span>
+            ) : null}
+            <span className="px-3 py-1 bg-[var(--leaf-container)]/40 text-[var(--leaf)] rounded-full text-[12px] font-medium">Em acompanhamento</span>
+            <span className="px-3 py-1 bg-[var(--surface-high)] text-[var(--ink-2)] rounded-full text-[12px]">
+              desde {cliente.criadoEm.slice(0, 10).split("-").reverse().join("/")}
+            </span>
+          </div>
+          <p className="mt-2 text-[12.5px] text-[var(--ink-muted)]">{cliente.email || "sem email"}</p>
+        </div>
       </div>
 
       <div className={secao}>
-        <h2 className="text-[15px] font-semibold mb-4">📋 Ficha</h2>
+        <h2 className={`${tituloSecao} mb-4`}><span className={iconeSecao}>badge</span> Ficha</h2>
         <div className="grid grid-cols-2 gap-4">
           <Campo titulo="Escola / série" valor={cliente.escolaSerie} />
           <Campo titulo="Responsável" valor={[cliente.responsavelNome, cliente.responsavelContato].filter(Boolean).join(" · ")} />
@@ -101,7 +112,7 @@ export default async function ClientePage({ params }: { params: Promise<{ id: st
 
       <div className={secao}>
         <div className="flex items-center justify-between">
-          <h2 className="text-[15px] font-semibold">📂 Arquivos</h2>
+          <h2 className={tituloSecao}><span className={iconeSecao}>attach_file</span> Arquivos</h2>
           <UploadForm clientId={cliente.id} comConteudo={false} />
         </div>
         <div className="mt-3 divide-y divide-black/5">
@@ -116,14 +127,14 @@ export default async function ClientePage({ params }: { params: Promise<{ id: st
       </div>
 
       <div className={secao}>
-        <h2 className="text-[15px] font-semibold">🕰️ Histórico</h2>
+        <h2 className={tituloSecao}><span className={iconeSecao}>timeline</span> Histórico</h2>
         <div className="mt-4">
           <Historico eventos={eventos} />
         </div>
       </div>
 
       <div className={secao}>
-        <h2 className="text-[15px] font-semibold">💬 Conversar no contexto de {cliente.nome.split(" ")[0]}</h2>
+        <h2 className={tituloSecao}><span className={iconeSecao}>forum</span> Conversar no contexto de {cliente.nome.split(" ")[0]}</h2>
         <p className="mt-1 mb-4 text-[12.5px] text-[var(--ink-muted)]">A conversa fica registrada no histórico do cliente.</p>
         <ChatAssistente clienteFixo={cliente.id} />
       </div>

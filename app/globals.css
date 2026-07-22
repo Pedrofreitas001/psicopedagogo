@@ -1,24 +1,86 @@
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap");
 @import "tailwindcss";
 
+/*
+ * Ícones Material Symbols hospedados localmente (subset de ~30 KB só com os
+ * ícones usados no app). Para adicionar um ícone novo: inclua o nome na lista
+ * `icon_names` da URL abaixo, baixe o woff2 resultante e substitua o arquivo.
+ * https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&icon_names=add,arrow_back,assignment,attach_file,auto_stories,badge,cable,dashboard,description,explore,fact_check,forum,group,history_edu,logout,person,psychology,save,send,settings,timeline&display=block
+ */
+@font-face {
+  font-family: "Material Symbols Outlined";
+  font-style: normal;
+  font-weight: 100 700;
+  font-display: block;
+  src: url("/fonts/material-symbols-subset.woff2") format("woff2");
+}
+
+/*
+ * Design system "Professional Care" (Google Stitch) — Material 3 teal.
+ * Os nomes antigos (--brand, --leaf, --ink-*, --surface-1, --grid) são mantidos
+ * para que todos os componentes existentes ganhem o novo visual sem reescrita.
+ */
 :root {
-  --page: #faf6ef;
-  --surface-1: #fffdf9;
-  --ink-1: #2b2521;
-  --ink-2: #5c5148;
-  --ink-muted: #97897c;
-  --grid: #e9e2d6;
-  --brand: #a85b38;
-  --brand-deep: #8c4a2c;
-  --leaf: #5c7a5e;
+  --page: #f9f9ff;               /* surface */
+  --surface-1: #ffffff;          /* cards (surface-container-lowest) */
+  --surface-low: #f0f3ff;        /* surface-container-low */
+  --surface-container: #e7eeff;  /* surface-container (sidebar) */
+  --surface-high: #dee8ff;       /* surface-container-high */
+  --ink-1: #111c2c;              /* on-surface */
+  --ink-2: #3f484c;              /* on-surface-variant */
+  --ink-muted: #6f787c;          /* outline */
+  --grid: #dbe3e7;               /* outline-variant suavizado */
+  --brand: #005264;              /* primary */
+  --brand-deep: #17677b;         /* surface-tint (hover do primary) */
+  --brand-container: #1e6b7f;    /* primary-container */
+  --leaf: #2c685f;               /* secondary */
+  --leaf-container: #afecdf;     /* secondary-container */
+  --card-shadow: 0px 4px 20px rgba(30, 107, 127, 0.04);
+  --card-shadow-hover: 0px 10px 32px rgba(30, 107, 127, 0.08);
 }
 
 body {
   background: var(--page);
   color: var(--ink-1);
-  font-family: "Avenir Next", "Segoe UI", system-ui, -apple-system, sans-serif;
+  font-family: "Inter", "Segoe UI", system-ui, -apple-system, sans-serif;
 }
 
-h1, h2, h3 {
-  font-family: Georgia, "Times New Roman", serif;
+h1, h2, h3, h4 {
+  font-family: "Plus Jakarta Sans", "Inter", system-ui, sans-serif;
   letter-spacing: -0.01em;
 }
+
+/* Cartão padrão do novo layout — branco, sombra suave teal, leve lift no hover. */
+.card {
+  background: var(--surface-1);
+  box-shadow: var(--card-shadow);
+  transition: box-shadow 0.3s ease, transform 0.3s ease;
+}
+.card:hover {
+  box-shadow: var(--card-shadow-hover);
+}
+
+.material-symbols-outlined {
+  font-family: "Material Symbols Outlined";
+  font-weight: normal;
+  font-style: normal;
+  font-size: 24px;
+  line-height: 1;
+  letter-spacing: normal;
+  text-transform: none;
+  display: inline-block;
+  white-space: nowrap;
+  word-wrap: normal;
+  direction: ltr;
+  -webkit-font-smoothing: antialiased;
+  font-variation-settings: "FILL" 0, "wght" 400, "GRAD" 0, "opsz" 24;
+  vertical-align: middle;
+  user-select: none;
+}
+.fill-icon {
+  font-variation-settings: "FILL" 1, "wght" 400, "GRAD" 0, "opsz" 24;
+}
+
+.custom-scrollbar::-webkit-scrollbar { width: 4px; }
+.custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+.custom-scrollbar::-webkit-scrollbar-thumb { background: #bfc8cc; border-radius: 10px; }

@@ -73,17 +73,21 @@ export default function ChatAssistente({
       )}
 
       {messages.length === 0 && (
-        <div className="rounded-2xl border border-black/8 bg-[var(--surface-1)] p-8 text-center">
-          <div className="text-3xl">🌱</div>
-          <h2 className="mt-3 text-xl font-semibold">Olá!</h2>
-          <p className="text-[15px] text-[var(--ink-2)]">Como posso ajudar?</p>
+        <div className="text-center py-10 space-y-3">
+          <div className="w-20 h-20 bg-[var(--leaf-container)]/50 rounded-full flex items-center justify-center mx-auto">
+            <span className="material-symbols-outlined fill-icon text-[var(--leaf)] text-[40px]">psychology</span>
+          </div>
+          <h2 className="text-xl font-semibold text-[var(--brand)]">Como posso ajudar hoje?</h2>
+          <p className="text-[14px] text-[var(--ink-2)] max-w-md mx-auto">
+            Respondo com base nos materiais, no prontuário e nos protocolos que a mentora preparou.
+          </p>
           {sugestoes && (
-            <div className="mt-5 flex flex-wrap justify-center gap-2">
+            <div className="mt-4 flex flex-wrap justify-center gap-2">
               {sugestoes.map((s) => (
                 <button
                   key={s}
                   onClick={() => perguntar(s)}
-                  className="text-[13px] rounded-full border border-[var(--brand)]/25 bg-[var(--brand)]/5 text-[var(--brand-deep)] px-3 py-1.5 hover:bg-[var(--brand)]/10"
+                  className="text-[13px] rounded-full border border-[var(--leaf)]/25 bg-white text-[var(--leaf)] px-4 py-2 shadow-sm hover:bg-[var(--leaf)]/5 active:scale-95 transition-all"
                 >
                   {s}
                 </button>
@@ -93,34 +97,44 @@ export default function ChatAssistente({
         </div>
       )}
 
-      <div className="space-y-4">
+      <div className="space-y-6">
         {messages.map((msg, idx) =>
           msg.papel === "usuario" ? (
-            <div key={idx} className="flex justify-end">
-              <div className="max-w-[80%] rounded-2xl rounded-br-sm bg-[var(--brand)] text-white px-4 py-2.5 text-sm">{msg.texto}</div>
+            <div key={idx} className="flex justify-end gap-3 items-start">
+              <div className="max-w-[80%] bg-white border border-[var(--grid)] shadow-[var(--card-shadow)] rounded-2xl rounded-br-sm px-4 py-3 text-sm">
+                {msg.texto}
+              </div>
+              <div className="w-8 h-8 rounded-full bg-[var(--surface-high)] shrink-0 flex items-center justify-center text-[var(--ink-2)]">
+                <span className="material-symbols-outlined text-[18px]">person</span>
+              </div>
             </div>
           ) : (
-            <div key={idx} className="max-w-[92%] space-y-2">
-              <div
-                className={`rounded-2xl rounded-bl-sm border px-4 py-3 text-sm leading-relaxed ${
-                  msg.recusado ? "border-amber-300 bg-amber-50" : "border-black/8 bg-[var(--surface-1)]"
-                }`}
-              >
-                <Markdown>{msg.texto}</Markdown>
+            <div key={idx} className="flex gap-3 items-start">
+              <div className="w-8 h-8 rounded-full bg-[var(--leaf)] text-white shrink-0 flex items-center justify-center shadow-sm">
+                <span className="material-symbols-outlined fill-icon text-[18px]">psychology</span>
               </div>
-              {msg.fontes.length > 0 && (
-                <div className="flex flex-wrap gap-1.5 text-[11.5px] text-[var(--ink-muted)]">
-                  {msg.fontes.map((f, i) => (
-                    <span key={i} className="rounded-full bg-black/4 px-2 py-0.5">
-                      {ROTULO_FONTE[f.tipo] ?? "•"} {f.titulo}
-                    </span>
-                  ))}
+              <div className="max-w-[88%] space-y-2">
+                <div
+                  className={`rounded-2xl rounded-tl-sm px-4 py-3.5 text-sm leading-relaxed border ${
+                    msg.recusado ? "border-amber-300 bg-amber-50" : "border-[var(--leaf)]/10 bg-[var(--leaf)]/8"
+                  }`}
+                >
+                  <Markdown>{msg.texto}</Markdown>
                 </div>
-              )}
+                {msg.fontes.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5 text-[11.5px] text-[var(--ink-muted)]">
+                    {msg.fontes.map((f, i) => (
+                      <span key={i} className="rounded-full bg-[var(--surface-low)] border border-[var(--grid)] px-2.5 py-0.5">
+                        {ROTULO_FONTE[f.tipo] ?? "•"} {f.titulo}
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
           )
         )}
-        {loading && <div className="text-sm text-[var(--ink-muted)] animate-pulse">Consultando os materiais da mentora…</div>}
+        {loading && <div className="text-sm text-[var(--ink-muted)] animate-pulse pl-11">Consultando os materiais da mentora…</div>}
         <div ref={bottomRef} />
       </div>
 
@@ -129,17 +143,26 @@ export default function ChatAssistente({
           e.preventDefault();
           perguntar(input);
         }}
-        className="sticky bottom-4 flex gap-2"
+        className="sticky bottom-4"
       >
-        <input
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          placeholder="Digite sua pergunta…"
-          className="flex-1 rounded-xl border border-black/12 bg-white px-4 py-3 text-sm shadow-sm focus:outline-none focus:border-[var(--brand)]"
-        />
-        <button type="submit" disabled={loading || !input.trim()} className="rounded-xl bg-[var(--brand)] hover:bg-[var(--brand-deep)] text-white px-5 text-sm font-medium disabled:opacity-40">
-          Enviar
-        </button>
+        <div className="flex items-center bg-white rounded-[24px] border border-[var(--grid)] shadow-lg p-2 gap-2">
+          <input
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            placeholder="Digite sua pergunta…"
+            className="flex-1 bg-transparent border-none px-3 py-2.5 text-sm focus:outline-none"
+          />
+          <button
+            type="submit"
+            disabled={loading || !input.trim()}
+            className="bg-[var(--brand)] hover:bg-[var(--brand-deep)] text-white w-11 h-11 rounded-full flex items-center justify-center shadow-md transition-all active:scale-90 disabled:opacity-40"
+          >
+            <span className="material-symbols-outlined text-[20px]">send</span>
+          </button>
+        </div>
+        <p className="mt-2 text-center text-[11px] text-[var(--ink-muted)]/70">
+          A IA pode errar. Confirme informações clínicas antes de registrá-las no prontuário.
+        </p>
       </form>
     </div>
   );

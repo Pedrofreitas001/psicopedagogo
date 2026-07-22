@@ -75,7 +75,7 @@ export default function ClienteForm({ clienteId, valores }: { clienteId?: number
   const label = "text-[var(--ink-2)]";
 
   return (
-    <form onSubmit={salvar} className="rounded-2xl border border-black/8 bg-[var(--surface-1)] p-5 space-y-4 max-w-lg w-full">
+    <form onSubmit={salvar} className="card rounded-2xl p-5 space-y-4 max-w-lg w-full">
       <div>
         <p className="text-[12px] font-semibold uppercase tracking-wide text-[var(--ink-muted)] mb-2">Identificação</p>
         <div className="grid grid-cols-2 gap-3">

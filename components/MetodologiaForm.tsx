@@ -49,7 +49,7 @@ export default function MetodologiaForm({ nota, onCancelLabel = "Cancelar" }: { 
   }
 
   return (
-    <form onSubmit={salvar} className="rounded-2xl border border-black/8 bg-[var(--surface-1)] p-5 space-y-3 w-full">
+    <form onSubmit={salvar} className="card rounded-2xl p-5 space-y-3 w-full">
       <label className="text-sm block">
         <span className="text-[var(--ink-2)]">Título</span>
         <input className="mt-1 w-full rounded-lg border border-black/10 bg-white px-2.5 py-2 text-sm" value={v.titulo} onChange={(e) => setV({ ...v, titulo: e.target.value })} required />

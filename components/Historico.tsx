@@ -8,7 +8,7 @@ function dataBr(iso: string): string {
 export default function Historico({ eventos }: { eventos: { tipo: string; descricao: string; criadoEm: string }[] }) {
   if (eventos.length === 0) {
     return (
-      <div className="rounded-2xl border border-black/8 bg-[var(--surface-1)] p-6 text-sm text-[var(--ink-muted)]">
+      <div className="card rounded-2xl p-6 text-sm text-[var(--ink-muted)]">
         Ainda não há registros — eles aparecem aqui conforme o acompanhamento acontece.
       </div>
     );

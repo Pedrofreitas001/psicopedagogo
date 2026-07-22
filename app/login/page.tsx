@@ -43,12 +43,14 @@ export default function LoginPage() {
     <div className="fixed inset-0 z-50 grid place-items-center bg-[var(--page)] px-4">
       <div className="w-full max-w-sm">
         <div className="text-center mb-7">
-          <div className="mx-auto h-12 w-12 rounded-full bg-[var(--brand)] text-white grid place-items-center text-xl">🌱</div>
-          <h1 className="mt-3 text-2xl font-semibold">Espaço Aprender</h1>
+          <div className="mx-auto h-12 w-12 rounded-xl bg-[var(--brand)] text-white grid place-items-center">
+            <span className="material-symbols-outlined fill-icon text-[26px]">psychology</span>
+          </div>
+          <h1 className="mt-3 text-2xl font-bold text-[var(--brand)]">Espaço Aprender</h1>
           <p className="text-sm text-[var(--ink-muted)]">Acompanhamento psicopedagógico</p>
         </div>
 
-        <form onSubmit={submit} className="rounded-2xl border border-black/8 bg-[var(--surface-1)] p-6 space-y-4 shadow-sm">
+        <form onSubmit={submit} className="card rounded-2xl p-6 space-y-4 shadow-sm">
           <p className="text-[15px] font-medium">
             {modo === "login" ? "Que bom ter você aqui. Entre para continuar." : "Criar sua conta"}
           </p>

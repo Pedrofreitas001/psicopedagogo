@@ -12,10 +12,10 @@ export default async function ClientesPage() {
   return (
     <div className="max-w-2xl">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">Clientes</h1>
+        <h1 className="text-[26px] font-bold text-[var(--brand)]">Clientes</h1>
         <ClienteForm />
       </div>
-      <div className="mt-6 rounded-2xl border border-black/8 bg-[var(--surface-1)] divide-y divide-black/5">
+      <div className="mt-6 card rounded-2xl divide-y divide-black/5">
         {clientes.map((c) => (
           <Link key={c.id} href={`/clientes/${c.id}`} className="flex items-center gap-3 px-5 py-4 hover:bg-black/2">
             <div className="h-9 w-9 rounded-full bg-[var(--brand)]/12 text-[var(--brand-deep)] grid place-items-center text-sm font-semibold shrink-0">

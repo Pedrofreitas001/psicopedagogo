@@ -79,25 +79,38 @@ export default function ProtocolForm({
     router.refresh();
   }
 
+  const totalCampos = protocolo.secoes.reduce((acc, s) => acc + s.campos.length, 0);
+  const preenchidos = Object.values(valores).filter((v) => v !== null && v !== "" && !(Array.isArray(v) && v.length === 0)).length;
+  const progresso = totalCampos > 0 ? Math.round((preenchidos / totalCampos) * 100) : 0;
+
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-2">
+      <div className="card rounded-2xl p-5 flex flex-col md:flex-row md:items-center gap-4">
         <button
           onClick={alternarStatus}
-          className={`rounded-full px-3 py-1 text-[12px] font-medium border ${
+          className={`rounded-full px-3.5 py-1.5 text-[12px] font-semibold border shrink-0 ${
             statusAtual === "concluido" ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-amber-50 text-amber-700 border-amber-200"
           }`}
         >
           {statusAtual === "concluido" ? "✓ Concluído — clique para reabrir" : "Em andamento — marcar como concluído"}
         </button>
-        <button onClick={excluir} className="ml-auto text-[12px] text-[var(--ink-muted)] hover:text-red-600">
+        <div className="flex-1 min-w-[180px]">
+          <div className="flex justify-between text-[11.5px] font-medium mb-1">
+            <span className="text-[var(--brand)]">{preenchidos} de {totalCampos} campos</span>
+            <span className="text-[var(--ink-muted)]">{progresso}% preenchido</span>
+          </div>
+          <div className="w-full h-2 bg-[var(--surface-high)] rounded-full overflow-hidden">
+            <div className="h-full bg-[var(--brand)] rounded-full transition-all" style={{ width: `${progresso}%` }} />
+          </div>
+        </div>
+        <button onClick={excluir} className="text-[12px] text-[var(--ink-muted)] hover:text-red-600 shrink-0">
           Excluir aplicação
         </button>
       </div>
 
       {protocolo.secoes.map((secao) => (
-        <div key={secao.id} className="rounded-2xl border border-black/8 bg-[var(--surface-1)] p-5">
-          <h3 className="text-[14px] font-semibold mb-3">{secao.titulo}</h3>
+        <div key={secao.id} className="card rounded-2xl p-6 border-t-2 border-[var(--leaf)]">
+          <h3 className="text-[15px] font-semibold mb-4">{secao.titulo}</h3>
           <div className="space-y-4">
             {secao.campos.map((campo) => (
               <CampoInput key={campo.id} campo={campo} valor={valores[campo.id] ?? null} onChange={(v) => set(campo.id, v)} onChangeCelula={(l, c, v) => setTabelaCelula(campo.id, l, c, v)} />
@@ -107,10 +120,15 @@ export default function ProtocolForm({
       ))}
 
       <div className="sticky bottom-4 flex items-center gap-3">
-        <button onClick={salvar} disabled={salvando} className="rounded-lg bg-[var(--brand)] hover:bg-[var(--brand-deep)] text-white px-5 py-2.5 text-sm font-medium shadow disabled:opacity-50">
+        <button
+          onClick={salvar}
+          disabled={salvando}
+          className="rounded-xl bg-[var(--brand)] hover:bg-[var(--brand-deep)] text-white px-6 py-3 text-sm font-semibold shadow-lg shadow-[var(--brand)]/20 flex items-center gap-2 disabled:opacity-50 transition-all"
+        >
+          <span className="material-symbols-outlined text-[18px]">save</span>
           {salvando ? "Salvando…" : "Salvar respostas"}
         </button>
-        {salvo && <span className="text-[12.5px] text-emerald-700">Salvo ✓</span>}
+        {salvo && <span className="text-[12.5px] text-emerald-700 font-medium">Salvo ✓</span>}
       </div>
     </div>
   );
