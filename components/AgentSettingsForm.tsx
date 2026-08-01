@@ -21,9 +21,9 @@ const TOGGLES: {
 }[] = [
   { key: "usaMetodologia", label: "Metodologia", descricao: "As notas cadastradas aqui em Configurações." },
   { key: "usaBiblioteca", label: "Biblioteca", descricao: "Documentos publicados e marcados como disponíveis." },
-  { key: "usaHistorico", label: "Histórico", descricao: "Objetivo, observações e linha do tempo do cliente." },
-  { key: "usaProntuario", label: "Prontuário", descricao: "Notas de sessão datadas de cada cliente." },
-  { key: "usaProtocolos", label: "Protocolos", descricao: "Protocolos aplicados a cada cliente e seus resultados." },
+  { key: "usaHistorico", label: "Histórico", descricao: "Ficha e linha do tempo do caso clínico." },
+  { key: "usaProntuario", label: "Registros", descricao: "Registros de raciocínio clínico datados de cada caso." },
+  { key: "usaProtocolos", label: "Protocolos", descricao: "Protocolos aplicados e hipóteses formuladas em cada caso." },
 ];
 
 const MODELOS_SUGERIDOS = [
@@ -122,7 +122,7 @@ export default function AgentSettingsForm({ inicial }: { inicial: Settings }) {
             rows={3}
             value={v.instrucoesExtra}
             onChange={(e) => setV({ ...v, instrucoesExtra: e.target.value })}
-            placeholder="Ex.: sempre sugira uma atividade lúdica ao final; nunca use termos técnicos com o cliente…"
+            placeholder="Ex.: sempre feche a resposta com uma pergunta; nunca sugira um diagnóstico, mesmo que a participante peça…"
             className="mt-1 w-full rounded-lg border border-black/10 bg-white px-2.5 py-2 text-sm"
           />
         </label>

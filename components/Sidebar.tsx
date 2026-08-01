@@ -3,17 +3,16 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 
-const NAV_CLIENTE = [
+const NAV_PARTICIPANTE = [
   { href: "/", label: "Início", icon: "dashboard" },
-  { href: "/materiais", label: "Materiais", icon: "auto_stories" },
+  { href: "/casos", label: "Meus Casos", icon: "cases" },
   { href: "/assistente", label: "Assistente", icon: "psychology" },
-  { href: "/historico", label: "Meu Histórico", icon: "timeline" },
-  { href: "/documentos", label: "Documentos", icon: "description" },
+  { href: "/materiais", label: "Materiais", icon: "auto_stories" },
 ];
 
 const NAV_MENTORA = [
   { href: "/", label: "Início", icon: "dashboard" },
-  { href: "/clientes", label: "Clientes", icon: "group" },
+  { href: "/participantes", label: "Participantes", icon: "group" },
   { href: "/biblioteca", label: "Biblioteca", icon: "auto_stories" },
   { href: "/assistente", label: "Assistente", icon: "psychology" },
   { href: "/configuracoes", label: "Configurações", icon: "settings" },
@@ -35,7 +34,7 @@ export default function Sidebar({
   const pathname = usePathname();
   const router = useRouter();
   const current = users.find((u) => u.id === currentUserId) ?? users[0];
-  const nav = currentUserPapel === "mentora" ? NAV_MENTORA : NAV_CLIENTE;
+  const nav = currentUserPapel === "mentora" ? NAV_MENTORA : NAV_PARTICIPANTE;
 
   async function switchUser(uid: string) {
     await fetch("/api/session", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ uid }) });
@@ -60,7 +59,7 @@ export default function Sidebar({
             <div className="font-bold text-[15px] leading-tight text-[var(--brand)] truncate" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
               {workspaceName}
             </div>
-            <div className="text-[12px] text-[var(--ink-2)]">Acompanhamento psicopedagógico</div>
+            <div className="text-[12px] text-[var(--ink-2)]">Mentoria de raciocínio clínico</div>
           </div>
         </div>
       </div>
@@ -113,7 +112,7 @@ export default function Sidebar({
             >
               {users.map((u) => (
                 <option key={u.id} value={u.id}>
-                  {u.nome} · {u.papel === "mentora" ? "Mentora" : "Cliente"}
+                  {u.nome} · {u.papel === "mentora" ? "Mentora" : "Participante"}
                 </option>
               ))}
             </select>

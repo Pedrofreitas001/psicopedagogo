@@ -46,8 +46,8 @@ export default function LoginPage() {
           <div className="mx-auto h-12 w-12 rounded-xl bg-[var(--brand)] text-white grid place-items-center">
             <span className="material-symbols-outlined fill-icon text-[26px]">psychology</span>
           </div>
-          <h1 className="mt-3 text-2xl font-bold text-[var(--brand)]">Espaço Aprender</h1>
-          <p className="text-sm text-[var(--ink-muted)]">Acompanhamento psicopedagógico</p>
+          <h1 className="mt-3 text-2xl font-bold text-[var(--brand)]">Comunicar & Aprender</h1>
+          <p className="text-sm text-[var(--ink-muted)]">Mentoria de raciocínio clínico</p>
         </div>
 
         <form onSubmit={submit} className="card rounded-2xl p-6 space-y-4 shadow-sm">

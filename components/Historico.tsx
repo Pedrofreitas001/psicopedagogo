@@ -1,4 +1,4 @@
-const ICONE: Record<string, string> = { conversa: "💬", material: "📚", observacao: "📝", resumo: "✨", sessao: "🗒️", protocolo: "🧩" };
+const ICONE: Record<string, string> = { conversa: "💬", material: "📚", observacao: "📝", resumo: "✨", sessao: "🗒️", protocolo: "🧩", hipotese: "💡" };
 
 function dataBr(iso: string): string {
   const [y, m, d] = iso.slice(0, 10).split("-");

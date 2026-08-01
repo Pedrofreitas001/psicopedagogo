@@ -24,8 +24,8 @@ function dataBr(iso: string): string {
   return `${d}/${m}/${y}`;
 }
 
-/** Aba de Protocolos do cliente: associar protocolos internalizados e acompanhar o resultado de cada aplicação. */
-export default function ProtocolosCliente({ clienteId, assignments }: { clienteId: number; assignments: Assignment[] }) {
+/** Aba de Protocolos do caso: associar protocolos internalizados e acompanhar o resultado de cada aplicação. */
+export default function ProtocolosCaso({ caseId, assignments }: { caseId: number; assignments: Assignment[] }) {
   const router = useRouter();
   const [aberto, setAberto] = useState(false);
   const [protocolos, setProtocolos] = useState<ProtocolSummary[] | null>(null);
@@ -49,7 +49,7 @@ export default function ProtocolosCliente({ clienteId, assignments }: { clienteI
     if (!protocolId) return;
     setLoading(true);
     setErro(null);
-    const res = await fetch(`/api/clientes/${clienteId}/protocolos`, {
+    const res = await fetch(`/api/casos/${caseId}/protocolos`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ protocolId: Number(protocolId), dataAplicacao: data }),

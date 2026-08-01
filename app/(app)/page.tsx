@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { countClients, countLibraryDocuments, countConversations } from "@/lib/data";
+import { countParticipants, countActiveCases, countConversations, listCasesByParticipant } from "@/lib/data";
 import { getCurrentUser } from "@/lib/auth";
 
 function StatCard({ icon, label, valor, accent }: { icon: string; label: string; valor: number; accent: "brand" | "leaf" | "tint" }) {
@@ -34,42 +34,45 @@ function Card({ href, icon, titulo, descricao }: { href: string; icon: string; t
 export default async function Home() {
   const user = (await getCurrentUser())!;
 
-  if (user.papel === "cliente") {
+  if (user.papel === "participante") {
     const primeiroNome = user.nome.split(" ")[0];
+    const casos = user.participantId ? await listCasesByParticipant(user.participantId) : [];
+    const ativos = casos.filter((c) => c.status === "ativo").length;
     return (
       <div className="max-w-3xl">
         <h1 className="text-[28px] font-bold text-[var(--brand)]">Olá, {primeiroNome}</h1>
-        <p className="mt-1 text-[15px] text-[var(--ink-2)]">Bem-vindo ao seu acompanhamento.</p>
+        <p className="mt-1 text-[15px] text-[var(--ink-2)]">
+          {ativos} caso(s) ativo(s) em análise · {casos.length} caso(s) no total.
+        </p>
         <div className="mt-8 grid grid-cols-1 sm:grid-cols-2 gap-5">
-          <Card href="/materiais" icon="auto_stories" titulo="Materiais" descricao="Os conteúdos que sua mentora preparou para a sua jornada." />
-          <Card href="/assistente" icon="psychology" titulo="Assistente" descricao="Tire dúvidas a qualquer hora, com base no seu acompanhamento." />
-          <Card href="/historico" icon="timeline" titulo="Meu Histórico" descricao="A linha do tempo do que vocês já construíram juntos." />
-          <Card href="/documentos" icon="description" titulo="Documentos" descricao="Seus arquivos e atividades, num lugar só." />
+          <Card href="/casos" icon="cases" titulo="Meus Casos" descricao="Os casos clínicos que você está analisando na mentoria." />
+          <Card href="/assistente" icon="psychology" titulo="Assistente" descricao="Converse com o mentor clínico sobre um caso ou uma dúvida geral." />
+          <Card href="/materiais" icon="auto_stories" titulo="Materiais" descricao="Os conteúdos que a mentora preparou para a formação." />
         </div>
       </div>
     );
   }
 
-  const [clientes, documentos, conversas] = await Promise.all([countClients(), countLibraryDocuments(), countConversations()]);
+  const [participantes, casosAtivos, conversas] = await Promise.all([countParticipants(), countActiveCases(), countConversations()]);
   const primeiroNome = user.nome.split(" ")[0];
 
   return (
     <div className="max-w-4xl space-y-8">
       <div>
         <h1 className="text-[28px] font-bold text-[var(--brand)]">Olá, {primeiroNome}</h1>
-        <p className="mt-1 text-[15px] text-[var(--ink-2)]">Visão geral do acompanhamento.</p>
+        <p className="mt-1 text-[15px] text-[var(--ink-2)]">Visão geral da mentoria.</p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-        <StatCard icon="group" label="Clientes em acompanhamento" valor={clientes} accent="leaf" />
-        <StatCard icon="auto_stories" label="Materiais na biblioteca" valor={documentos} accent="brand" />
+        <StatCard icon="group" label="Participantes na mentoria" valor={participantes} accent="leaf" />
+        <StatCard icon="cases" label="Casos clínicos ativos" valor={casosAtivos} accent="brand" />
         <StatCard icon="forum" label="Conversas registradas" valor={conversas} accent="tint" />
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-        <Card href="/clientes" icon="group" titulo="Clientes" descricao="A jornada de cada cliente: objetivo, prontuário, protocolos e histórico." />
+        <Card href="/participantes" icon="group" titulo="Participantes" descricao="A evolução de cada participante: estágio, casos clínicos e hipóteses." />
         <Card href="/biblioteca" icon="auto_stories" titulo="Biblioteca" descricao="Seus materiais organizados por pastas — a alma do sistema." />
-        <Card href="/assistente" icon="psychology" titulo="Assistente" descricao="Converse com a base de conhecimento no contexto de um cliente." />
+        <Card href="/assistente" icon="psychology" titulo="Assistente" descricao="Converse com o agente no contexto de um caso clínico." />
         <Card href="/configuracoes" icon="settings" titulo="Configurações" descricao="Sua metodologia, o escopo do assistente e o modelo de IA." />
       </div>
     </div>

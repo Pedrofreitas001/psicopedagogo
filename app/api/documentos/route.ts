@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getCategory, getClient, createDocument, logEvent } from "@/lib/data";
+import { getCategory, getCase, createDocument, logEvent } from "@/lib/data";
 import { getCurrentUser } from "@/lib/auth";
 import { salvarArquivo } from "@/lib/storage";
 
@@ -22,20 +22,24 @@ export async function POST(req: Request) {
   }
 
   const categoriaId = form.get("categoriaId") ? Number(form.get("categoriaId")) : null;
-  let clientId = form.get("clientId") ? Number(form.get("clientId")) : null;
+  const caseId = form.get("caseId") ? Number(form.get("caseId")) : null;
 
-  // Permissões: biblioteca é só da mentora; cliente só envia para si mesmo
+  // Permissões: biblioteca é só da mentora; participante só envia para casos dela
   if (categoriaId && user.papel !== "mentora") {
     return NextResponse.json({ error: "Apenas a mentora publica na biblioteca." }, { status: 403 });
   }
-  if (user.papel === "cliente") clientId = user.clientId;
-  if (!categoriaId && !clientId) return NextResponse.json({ error: "Escolha uma categoria ou um cliente." }, { status: 400 });
+  if (!categoriaId && !caseId) return NextResponse.json({ error: "Escolha uma categoria ou um caso." }, { status: 400 });
 
   if (categoriaId && !(await getCategory(categoriaId))) {
     return NextResponse.json({ error: "Categoria não encontrada." }, { status: 404 });
   }
-  if (clientId && !(await getClient(clientId))) {
-    return NextResponse.json({ error: "Cliente não encontrado." }, { status: 404 });
+  let caso = null;
+  if (caseId) {
+    caso = await getCase(caseId);
+    if (!caso) return NextResponse.json({ error: "Caso não encontrado." }, { status: 404 });
+    if (user.papel !== "mentora" && caso.participantId !== user.participantId) {
+      return NextResponse.json({ error: "Sem acesso a este caso." }, { status: 403 });
+    }
   }
 
   const dados = Buffer.from(await arquivo.arrayBuffer());
@@ -50,7 +54,7 @@ export async function POST(req: Request) {
 
   const id = await createDocument({
     categoriaId,
-    clientId: categoriaId ? null : clientId,
+    caseId: categoriaId ? null : caseId,
     nome: arquivo.name,
     tipo,
     tamanho: arquivo.size,
@@ -59,8 +63,8 @@ export async function POST(req: Request) {
     enviadoPor: user.nome,
   });
 
-  if (!categoriaId && clientId) {
-    await logEvent(clientId, "material", `${user.nome} enviou o arquivo “${arquivo.name}”.`);
+  if (!categoriaId && caseId && caso) {
+    await logEvent(caso.participantId, caseId, "material", `${user.nome} enviou o arquivo “${arquivo.name}”.`);
   }
   return NextResponse.json({ ok: true, id });
 }

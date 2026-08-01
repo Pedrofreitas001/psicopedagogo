@@ -2,7 +2,7 @@
   "name": "psicopedagogo",
   "version": "0.1.0",
   "private": true,
-  "description": "Plataforma de acompanhamento psicopedagógico — MVP (biblioteca, clientes, assistente de estudos)",
+  "description": "Comunicar & Aprender — mentoria de raciocínio clínico em compreensão leitora (protocolos, hipóteses, mentor de IA socrático)",
   "scripts": {
     "dev": "next dev",
     "build": "next build",

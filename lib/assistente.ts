@@ -1,43 +1,57 @@
 import {
   listKnowledge,
   listLibraryDocuments,
-  listClientDocuments,
-  getClient,
-  listClientEvents,
-  listRecentSessionNotes,
+  listCaseDocuments,
+  getCase,
+  getParticipant,
+  listCasesByParticipant,
+  listParticipantEvents,
+  listCaseEvents,
+  listRecentCaseNotes,
   listRecentMessages,
-  listAllMessages,
+  listAllMessagesForParticipant,
   createConversation,
   createMessage,
   logEvent,
   getAgentSettings,
-  listClientAssignments,
+  listCaseAssignments,
+  listHypotheses,
   getProtocol,
   getResponses,
   type AgentSettings,
   type Protocol,
   type ProtocolField,
   type ProtocolResponse,
+  type Hypothesis,
 } from "./data";
 
 /**
- * Assistente de Estudos — responde usando exclusivamente as fontes ligadas em
- * Configurações → Escopo do assistente:
- *   1. a metodologia cadastrada pela mentora (tabela knowledge);
- *   2. os documentos da biblioteca e do cliente marcados como disponíveis;
- *   3. o histórico daquele cliente (objetivo/observações e linha do tempo);
- *   4. o prontuário (notas de sessão datadas);
- *   5. os protocolos aplicados ao cliente e seus resultados registrados.
+ * Mentor Clínico Digital — não é um chatbot de perguntas e respostas. Conduz
+ * a participante da mentoria por um raciocínio clínico estruturado sobre um
+ * caso (a criança que ela atende), seguindo o método de 6 etapas:
+ *   1. organização dos dados já disponíveis;
+ *   2. identificação de lacunas;
+ *   3. análise pelas duas lentes (contexto e processamento cognitivo);
+ *   4. construção de hipóteses;
+ *   5. busca de evidências a favor/contra;
+ *   6. tomada de decisão clínica.
  *
- * Nunca internet, nunca opinião própria, nunca diagnóstico. Quando a base
- * não sustenta uma resposta, ele diz isso com clareza.
+ * Ele NUNCA diagnostica, nunca confirma conclusões clínicas e nunca entrega
+ * uma resposta pronta quando pode conduzir por perguntas — o julgamento
+ * final é sempre da participante. Sempre que possível, explica por que está
+ * perguntando o que perguntou (transparência do raciocínio).
  *
- * Com OPENROUTER_API_KEY definida, a redação final é feita por um modelo via
- * OpenRouter com um prompt rígido de fundamentação; sem a chave, o assistente
- * compõe a resposta diretamente dos trechos recuperados (modo demo, offline).
+ * Fontes disponíveis (ligadas em Configurações → Escopo do assistente):
+ *   metodologia, biblioteca (geral + arquivos do caso), ficha e linha do
+ *   tempo do caso, registros de raciocínio clínico datados, protocolo(s)
+ *   aplicados e hipóteses já formuladas para o caso.
+ *
+ * Com OPENROUTER_API_KEY definida, a condução é feita por um modelo via
+ * OpenRouter com um prompt rígido de método; sem a chave, o assistente
+ * apenas organiza o que já está registrado (modo demo, offline).
  */
 
-export type Fonte = { tipo: "documento" | "metodologia" | "historico" | "prontuario" | "protocolo"; titulo: string };
+export type Fonte = { tipo: "documento" | "metodologia" | "historico" | "prontuario" | "protocolo" | "hipotese"; titulo: string };
 export type RespostaAssistente = { resposta: string; fontes: Fonte[]; recusado: boolean };
 
 const STOPWORDS = new Set(
@@ -59,10 +73,9 @@ function tokens(text: string): string[] {
 
 type Trecho = { fonte: Fonte; texto: string; score: number };
 
-/** Recupera os trechos da base mais relacionados à pergunta, no escopo do cliente e do agente. */
-export async function recuperarBase(pergunta: string, clientId: number | null, settings: AgentSettings): Promise<Trecho[]> {
+/** Recupera os trechos da base mais relacionados à pergunta, no escopo do caso (ou geral) e do agente. */
+export async function recuperarBase(pergunta: string, participantId: number, caseId: number | null, settings: AgentSettings): Promise<Trecho[]> {
   const q = new Set(tokens(pergunta));
-  if (q.size === 0) return [];
 
   const candidatos: { fonte: Fonte; texto: string }[] = [];
 
@@ -73,44 +86,49 @@ export async function recuperarBase(pergunta: string, clientId: number | null, s
 
   if (settings.usaBiblioteca) {
     const biblioteca = await listLibraryDocuments();
-    const doCliente = clientId ? await listClientDocuments(clientId) : [];
-    for (const d of [...biblioteca, ...doCliente]) {
+    const doCaso = caseId ? await listCaseDocuments(caseId) : [];
+    for (const d of [...biblioteca, ...doCaso]) {
       if (!d.disponivelAssistente || !d.conteudo) continue;
       candidatos.push({ fonte: { tipo: "documento", titulo: d.nome }, texto: `${d.nome}. ${d.conteudo}` });
     }
   }
 
-  if (clientId && settings.usaHistorico) {
-    const cli = await getClient(clientId);
-    if (cli && (cli.objetivo || cli.observacoes || cli.diagnosticoPreliminar || cli.queixaPrincipal)) {
+  if (caseId && settings.usaHistorico) {
+    const caso = await getCase(caseId);
+    if (caso && (caso.objetivo || caso.observacoes || caso.diagnosticoPreliminar || caso.queixaPrincipal)) {
       candidatos.push({
-        fonte: { tipo: "historico", titulo: `Acompanhamento de ${cli.nome}` },
+        fonte: { tipo: "historico", titulo: `Ficha do caso ${caso.nome}` },
         texto: juntarComPonto([
-          cli.objetivo && `Objetivo do acompanhamento: ${cli.objetivo}`,
-          cli.queixaPrincipal && `Queixa principal registrada: ${cli.queixaPrincipal}`,
-          cli.diagnosticoPreliminar && `Diagnóstico preliminar já anotado pela mentora: ${cli.diagnosticoPreliminar}`,
-          cli.observacoes && `Observações da mentora: ${cli.observacoes}`,
+          caso.objetivo && `Objetivo da análise: ${caso.objetivo}`,
+          caso.queixaPrincipal && `Queixa principal registrada: ${caso.queixaPrincipal}`,
+          caso.diagnosticoPreliminar && `Diagnóstico preliminar já anotado: ${caso.diagnosticoPreliminar}`,
+          caso.observacoes && `Observações da participante: ${caso.observacoes}`,
         ]),
       });
     }
-    const eventos = await listClientEvents(clientId, 12);
+    const eventos = await listCaseEvents(caseId, 12);
     if (eventos.length) {
+      candidatos.push({ fonte: { tipo: "historico", titulo: "Linha do tempo recente do caso" }, texto: eventos.map((e) => e.descricao).join(" ") });
+    }
+  } else if (!caseId && settings.usaHistorico) {
+    const eventos = await listParticipantEvents(participantId, 12);
+    if (eventos.length) {
+      candidatos.push({ fonte: { tipo: "historico", titulo: "Linha do tempo recente da participante" }, texto: eventos.map((e) => e.descricao).join(" ") });
+    }
+  }
+
+  if (caseId && settings.usaProntuario) {
+    const notas = await listRecentCaseNotes(caseId, 8);
+    for (const nota of notas) {
       candidatos.push({
-        fonte: { tipo: "historico", titulo: "Linha do tempo recente" },
-        texto: eventos.map((e) => e.descricao).join(" "),
+        fonte: { tipo: "prontuario", titulo: `Registro de ${nota.dataSessao.slice(0, 10).split("-").reverse().join("/")}` },
+        texto: nota.conteudo,
       });
     }
   }
 
-  if (clientId && settings.usaProntuario) {
-    const notas = await listRecentSessionNotes(clientId, 8);
-    for (const nota of notas) {
-      candidatos.push({ fonte: { tipo: "prontuario", titulo: `Sessão de ${nota.dataSessao.slice(0, 10).split("-").reverse().join("/")}` }, texto: nota.conteudo });
-    }
-  }
-
-  if (clientId && settings.usaProtocolos) {
-    const assignments = await listClientAssignments(clientId);
+  if (caseId && settings.usaProtocolos) {
+    const assignments = await listCaseAssignments(caseId);
     for (const a of assignments.slice(0, 5)) {
       const [protocolo, respostas] = await Promise.all([getProtocol(a.protocolId), getResponses(a.id)]);
       if (!protocolo) continue;
@@ -121,12 +139,22 @@ export async function recuperarBase(pergunta: string, clientId: number | null, s
         texto,
       });
     }
+
+    const hipoteses = await listHypotheses(caseId);
+    for (const h of hipoteses.slice(0, 6)) {
+      candidatos.push({ fonte: { tipo: "hipotese", titulo: `Hipótese (${statusHipotese(h.status)})` }, texto: resumirHipotese(h) });
+    }
+  }
+
+  // Sem pergunta tokenizável (ex.: mensagem muito curta), ainda assim entrega
+  // o contexto disponível — o agente precisa dele para conduzir a etapa 1.
+  if (q.size === 0) {
+    return candidatos.slice(0, 8).map((c) => ({ fonte: c.fonte, texto: c.texto, score: 1 }));
   }
 
   const trechos: Trecho[] = [];
   for (const c of candidatos) {
     const t = tokens(c.texto);
-    if (t.length === 0) continue;
     let hits = 0;
     const vistos = new Set<string>();
     for (const tok of t) {
@@ -135,55 +163,81 @@ export async function recuperarBase(pergunta: string, clientId: number | null, s
         hits++;
       }
     }
-    if (hits === 0) continue;
-    trechos.push({ fonte: c.fonte, texto: c.texto, score: hits / Math.sqrt(q.size) });
+    // Hipóteses e protocolo do caso sempre entram como contexto de fundo,
+    // mesmo com pouca sobreposição de palavras — são o núcleo da memória do caso.
+    const sempreRelevante = c.fonte.tipo === "hipotese" || c.fonte.tipo === "protocolo" || c.fonte.tipo === "historico";
+    if (hits === 0 && !sempreRelevante) continue;
+    trechos.push({ fonte: c.fonte, texto: c.texto, score: hits === 0 ? 0.1 : hits / Math.sqrt(q.size) });
   }
   trechos.sort((a, b) => b.score - a.score);
-  return trechos.slice(0, 4);
+  return trechos.slice(0, 8);
 }
 
-const RECUSA =
-  "Não encontrei, nos materiais e na metodologia cadastrados pela mentora, base suficiente para responder a essa pergunta " +
-  "com segurança. Prefiro não arriscar uma resposta sem fundamento. Que tal levar essa dúvida diretamente para a mentora " +
-  "no próximo encontro? Ela pode avaliar com calma e, se fizer sentido, incluir um material sobre isso na biblioteca.";
+function statusHipotese(status: Hypothesis["status"]): string {
+  return status === "ativa" ? "ativa" : status === "confirmada" ? "confirmada" : "descartada";
+}
 
-export async function responder(pergunta: string, clientId: number | null, nomeCliente: string): Promise<RespostaAssistente> {
+function resumirHipotese(h: Hypothesis): string {
+  const partes = [h.texto];
+  if (h.evidenciasFavor) partes.push(`A favor: ${h.evidenciasFavor}`);
+  if (h.evidenciasContra) partes.push(`Contra: ${h.evidenciasContra}`);
+  return partes.join(" — ");
+}
+
+export async function responder(pergunta: string, participantId: number, caseId: number | null, nomeParticipante: string, nomeCaso: string | null): Promise<RespostaAssistente> {
   const settings = await getAgentSettings();
-  const trechos = await recuperarBase(pergunta, clientId, settings);
-  // Sem apoio mínimo na base → recusa transparente (regra do produto)
-  if (trechos.length === 0 || trechos[0].score < 0.5) {
-    return { resposta: RECUSA, fontes: [], recusado: true };
-  }
+  const trechos = await recuperarBase(pergunta, participantId, caseId, settings);
   const fontes = trechos.map((t) => t.fonte);
 
   if (process.env.OPENROUTER_API_KEY) {
     try {
-      const resposta = await redigirComIA(pergunta, trechos, clientId, nomeCliente, settings);
+      const resposta = await conduzirComIA(pergunta, trechos, participantId, caseId, nomeParticipante, nomeCaso, settings);
       return { resposta, fontes, recusado: false };
     } catch (e) {
-      // Falha de API não pode derrubar o atendimento: cai no modo offline.
+      // Falha de API não pode derrubar a mentoria: cai no modo offline.
       // Fica registrado nos logs da função (Vercel → projeto → Logs) para diagnóstico.
       console.error("[assistente] Falha ao chamar a OpenRouter, caindo para o modo offline:", e);
     }
   }
 
-  // Modo offline (sem IA): não há redação real, só uma composição literal dos
-  // trechos recuperados — muito mais limitada que o modo com OpenRouter.
+  // Modo offline (sem IA): não há condução socrática real — apenas organiza
+  // o que já está registrado e sugere as perguntas-guia do método.
+  return respostaOffline(trechos, fontes, nomeCaso);
+}
+
+function respostaOffline(trechos: Trecho[], fontes: Fonte[], nomeCaso: string | null): RespostaAssistente {
+  if (trechos.length === 0) {
+    return {
+      resposta:
+        "[Modo offline — sem IA ativa] Ainda não há nada registrado para eu organizar aqui. Um bom primeiro passo (Etapa 1 do método): " +
+        "reúna o que você já tem sobre o caso — anamnese, observações clínicas, resultados de testes e comportamento durante a avaliação " +
+        "— e comece a registrar no protocolo ou nos registros de raciocínio clínico.",
+      fontes: [],
+      recusado: false,
+    };
+  }
   const corpo = trechos
-    .slice(0, 2)
-    .map((t) => resumirTrecho(t.texto))
+    .slice(0, 3)
+    .map((t) => `${t.fonte.titulo}: ${resumirTrecho(t.texto)}`)
     .join("\n\n");
-  const nomes = fontes.map((f) => `“${f.titulo}”`).join(", ");
+  const perguntasGuia = [
+    "O que você já sabe com segurança, e o que ainda é suposição?",
+    "Essa observação aparece em mais de uma fonte (protocolo, registros, história) ou é isolada?",
+    "Pela lente de contexto e pela lente de processamento cognitivo, o que cada uma sugere aqui?",
+  ];
   return {
-    resposta: `[Modo offline — sem IA ativa] Com base no que a mentora preparou (${nomes}):\n\n${corpo}\n\nSe quiser, posso detalhar algum desses pontos — e qualquer dúvida clínica fica para a mentora.`,
+    resposta:
+      `[Modo offline — sem IA ativa] Aqui está o que já está registrado${nomeCaso ? ` sobre ${nomeCaso}` : ""}:\n\n${corpo}\n\n` +
+      `Sem IA ativa eu não consigo conduzir a reflexão com perguntas encadeadas — mas fica como ponto de partida:\n` +
+      perguntasGuia.map((p) => `• ${p}`).join("\n"),
     fontes,
     recusado: false,
   };
 }
 
 function resumirTrecho(texto: string): string {
-  const frases = texto.split(/(?<=[.!?])\s+/).slice(0, 4);
-  return frases.join(" ").slice(0, 600);
+  const frases = texto.split(/(?<=[.!?])\s+/).slice(0, 3);
+  return frases.join(" ").slice(0, 400);
 }
 
 /** Converte o preenchimento de um protocolo (respostas por campo) num texto corrido para a base de recuperação do assistente. */
@@ -234,14 +288,14 @@ function juntarComPonto(partes: (string | null | undefined)[]): string {
 }
 
 const TOM_INSTRUCAO: Record<AgentSettings["tom"], string> = {
-  acolhedor: "Tom: acolhedor, encorajador e simples, como uma mentora carinhosa.",
-  formal: "Tom: profissional e formal, como um relatório técnico claro.",
-  direto: "Tom: direto e objetivo, frases curtas, sem rodeios.",
+  acolhedor: "Tom: acolhedor e encorajador, como um supervisor experiente que constrói confiança — mas sem perder o rigor das perguntas.",
+  formal: "Tom: profissional e formal, como uma supervisão clínica estruturada.",
+  direto: "Tom: direto e objetivo, perguntas curtas e bem direcionadas, sem rodeios.",
 };
 
 export const MODELO_PADRAO = "anthropic/claude-sonnet-5";
 
-/** Chama um modelo via OpenRouter (API compatível com OpenAI) para redigir a resposta final. */
+/** Chama um modelo via OpenRouter (API compatível com OpenAI) para conduzir a etapa do raciocínio. */
 async function chamarOpenRouter(
   system: string,
   messages: { role: "user" | "assistant"; content: string }[],
@@ -258,7 +312,7 @@ async function chamarOpenRouter(
       Authorization: `Bearer ${apiKey}`,
       "Content-Type": "application/json",
       "HTTP-Referer": process.env.OPENROUTER_SITE_URL || "https://espacoaprender.app",
-      "X-Title": process.env.OPENROUTER_SITE_NAME || "Espaço Aprender",
+      "X-Title": process.env.OPENROUTER_SITE_NAME || "Comunicar & Aprender",
     },
     body: JSON.stringify({
       model,
@@ -294,27 +348,47 @@ export async function testarConexaoIA(): Promise<{ ok: boolean; modelo?: string;
   }
 }
 
-async function redigirComIA(pergunta: string, trechos: Trecho[], clientId: number | null, nomeCliente: string, settings: AgentSettings): Promise<string> {
-  const contexto = trechos.map((t, i) => `[Fonte ${i + 1} — ${t.fonte.tipo}: ${t.fonte.titulo}]\n${t.texto}`).join("\n\n");
-  const historico = clientId ? await listRecentMessages(clientId, 10) : [];
+async function conduzirComIA(
+  pergunta: string,
+  trechos: Trecho[],
+  participantId: number,
+  caseId: number | null,
+  nomeParticipante: string,
+  nomeCaso: string | null,
+  settings: AgentSettings
+): Promise<string> {
+  const contexto = trechos.length
+    ? trechos.map((t, i) => `[Fonte ${i + 1} — ${t.fonte.tipo}: ${t.fonte.titulo}]\n${t.texto}`).join("\n\n")
+    : "(Nenhuma fonte relevante encontrada ainda para este caso — pode ser o início da análise.)";
+  const historico = await listRecentMessages(participantId, caseId, 10);
 
-  const system = `Você é o Assistente de Estudos de uma plataforma de acompanhamento psicopedagógico. Você apoia a metodologia da mentora — você não é um produto de IA e não se apresenta como tal.
+  const system = `Você é o Mentor Clínico Digital da mentoria "${await nomeDoWorkspace()}" — um supervisor experiente que conduz ${nomeParticipante}${
+    nomeCaso ? `, analisando o caso de ${nomeCaso},` : ""
+  } pelo raciocínio clínico em compreensão leitora. Você não é um chatbot de perguntas e respostas.
 
-Como responder (isso é o que mais importa):
-- NUNCA cole ou liste as fontes uma atrás da outra. Leia todas, entenda o que cada uma diz, e escreva uma resposta corrida que RESPONDE DIRETAMENTE à pergunta, conectando as partes relevantes entre si. O leitor não deve perceber que você está "juntando trechos" — deve parecer alguém que leu tudo e já sabe a resposta.
-- Comece respondendo à pergunta em 1 frase direta. Depois, no máximo 2 parágrafos curtos, traga o raciocínio e o contexto específico ${clientId ? `de ${nomeCliente}` : ""} que sustentam essa resposta.
-- Só traga informação das fontes que realmente ajuda a responder a ESTA pergunta — ignore fontes pouco relevantes mesmo que estejam na lista.
-- Não repita rótulos como "Fonte 1" ou nomes de arquivo dentro do texto da resposta — cite naturalmente ("segundo o protocolo que a mentora preparou...", "as sessões recentes mostram que...").
+O método que você segue tem 6 etapas — identifique mentalmente em qual delas a conversa está e conduza por ela:
+1. Organização dos dados: o que já se sabe (anamnese, observações, testes, comportamento na avaliação).
+2. Identificação de lacunas: o que ainda falta saber; que hipótese está sem evidência suficiente.
+3. Análise pelas duas lentes: Lente de Contexto (história da criança, família, escola, oportunidades de leitura, autonomia, experiências prévias) e Lente de Processamento Cognitivo (linguagem, vocabulário, fluência, memória, funções executivas, inferência, compreensão).
+4. Construção de hipóteses: nunca afirme — pergunte que hipóteses os dados sustentam, se há interpretação alternativa, se há dados que contradizem.
+5. Busca de evidências: o que confirma, o que enfraquece, o que ainda precisa ser coletado.
+6. Tomada de decisão clínica: qual a hipótese mais consistente agora, qual o próximo passo da avaliação, isso muda o plano de intervenção, o que comunicar à família/escola.
+
+Como conduzir (o que mais importa):
+- Você NUNCA responde diretamente a uma observação clínica com uma conclusão pronta. Em vez disso, faça de 1 a 3 perguntas que levem ${nomeParticipante} a examinar melhor o que ela trouxe — sempre ancoradas nas etapas acima e nas fontes disponíveis.
+- Depois das perguntas, em 1 frase curta, explique por que está perguntando isso (transparência do raciocínio) — ex.: "Pergunto isso porque X pode indicar Y ou Z, e isolar qual é o caso muda a hipótese que faz sentido perseguir."
+- Só ofereça uma síntese ou organização mais longa quando ${nomeParticipante} já tiver explorado as perguntas anteriores, ou quando ela pedir explicitamente um resumo/organização do que já foi discutido.
+- Use as fontes abaixo (protocolo, hipóteses já registradas, registros de raciocínio clínico, histórico, metodologia, biblioteca) para ancorar as perguntas em dados reais do caso — cite-as naturalmente, sem repetir rótulos como "Fonte 1".
 
 Regras invioláveis:
-- Responda APENAS com base nas fontes fornecidas abaixo (metodologia da mentora, documentos da biblioteca, histórico e prontuário do cliente). Nunca use conhecimento externo, internet ou opinião própria, e nunca invente algo que não esteja nas fontes.
-- Você PODE relatar o que a mentora já registrou (objetivo, queixa, diagnóstico preliminar, notas de sessão) — isso é fato documentado, não invenção sua. O que você NUNCA deve fazer é formular, sugerir ou confirmar um diagnóstico por conta própria, nem dar opinião clínica além do que está escrito. Se perguntarem algo que exige avaliação (não apenas relatar o que já foi anotado), diga isso e encaminhe para a mentora.
-- Se as fontes não sustentarem a resposta, diga claramente que não há evidências na base e sugira falar com a mentora.
+- NUNCA emita diagnóstico, NUNCA confirme uma conclusão clínica como certa, NUNCA substitua a supervisão da mentora. A decisão final é sempre de ${nomeParticipante}.
+- NUNCA invente dado que não esteja nas fontes ou no que ${nomeParticipante} acabou de relatar na conversa.
+- Se ${nomeParticipante} pedir uma resposta pronta ou um diagnóstico, recuse com gentileza e devolva com uma pergunta que a ajude a chegar lá sozinha.
 - ${TOM_INSTRUCAO[settings.tom]}
 - Português do Brasil.
 ${settings.instrucoesExtra ? `\nInstruções adicionais definidas pela mentora:\n${settings.instrucoesExtra}` : ""}
 
-Fontes disponíveis para esta pergunta (uso interno seu — não cite os rótulos "Fonte N" na resposta):
+Fontes disponíveis sobre este caso (uso interno seu — não cite os rótulos "Fonte N" na resposta):
 
 ${contexto}`;
 
@@ -326,9 +400,18 @@ ${contexto}`;
   return chamarOpenRouter(system, messages, 1024, settings.modelo || undefined);
 }
 
+let _workspaceNomeCache: string | null = null;
+async function nomeDoWorkspace(): Promise<string> {
+  if (_workspaceNomeCache) return _workspaceNomeCache;
+  const { getWorkspaceName } = await import("./data");
+  _workspaceNomeCache = await getWorkspaceName();
+  return _workspaceNomeCache;
+}
+
 /** Salva a troca no banco e registra o evento na linha do tempo. */
 export async function salvarConversa(
-  clientId: number,
+  participantId: number,
+  caseId: number | null,
   autor: string,
   pergunta: string,
   resposta: RespostaAssistente,
@@ -336,80 +419,87 @@ export async function salvarConversa(
 ): Promise<number> {
   let convId = conversationId;
   if (!convId) {
-    convId = await createConversation(clientId, pergunta.slice(0, 80));
-    await logEvent(clientId, "conversa", `${autor} iniciou uma conversa: “${pergunta.slice(0, 80)}”.`);
+    convId = await createConversation(participantId, caseId, pergunta.slice(0, 80));
+    await logEvent(participantId, caseId, "conversa", `${autor} iniciou uma conversa: “${pergunta.slice(0, 80)}”.`);
   }
   await createMessage({ conversationId: convId, papel: "usuario", autor, conteudo: pergunta, fontes: [] });
-  await createMessage({ conversationId: convId, papel: "assistente", autor: "Assistente de Estudos", conteudo: resposta.resposta, fontes: resposta.fontes });
+  await createMessage({ conversationId: convId, papel: "assistente", autor: "Mentor Clínico", conteudo: resposta.resposta, fontes: resposta.fontes });
   return convId;
 }
 
 /**
- * "Gerar resumo da evolução": lê todas as conversas e eventos do cliente e
- * produz uma síntese para a mentora. Com IA (OpenRouter) quando há chave;
- * senão, um resumo estruturado determinístico.
+ * "Gerar resumo pré-encontro": lê hipóteses, protocolo e conversas de todos
+ * os casos ativos da participante e produz uma síntese para a mentora usar
+ * antes do próximo encontro da mentoria — hipóteses formadas, pontos ainda
+ * frágeis, dúvidas recorrentes e questões para discussão. Com IA (OpenRouter)
+ * quando há chave; senão, um resumo estruturado determinístico.
  */
-export async function gerarResumoEvolucao(clientId: number): Promise<string> {
-  const cli = await getClient(clientId);
-  if (!cli) throw new Error("Cliente não encontrado");
+export async function gerarResumoEvolucao(participantId: number): Promise<string> {
+  const participante = await getParticipant(participantId);
+  if (!participante) throw new Error("Participante não encontrada");
 
-  const msgs = await listAllMessages(clientId);
-  const eventos = await listClientEvents(clientId, 100);
+  const casos = await listCasesByParticipant(participantId);
+  const msgs = await listAllMessagesForParticipant(participantId);
+  const eventos = await listParticipantEvents(participantId, 100);
   const settings = await getAgentSettings();
 
-  if (process.env.OPENROUTER_API_KEY && (msgs.length > 0 || eventos.length > 0)) {
+  const hipotesesPorCaso = await Promise.all(
+    casos.map(async (c) => ({ caso: c, hipoteses: await listHypotheses(c.id) }))
+  );
+
+  if (process.env.OPENROUTER_API_KEY) {
     try {
       const material = [
-        `Cliente: ${cli.nome}${cli.idade ? ` (${cli.idade} anos)` : ""}`,
-        `Objetivo do acompanhamento: ${cli.objetivo || "—"}`,
-        `Queixa principal: ${cli.queixaPrincipal || "—"}`,
-        `Diagnóstico preliminar: ${cli.diagnosticoPreliminar || "—"}`,
-        `Observações da mentora: ${cli.observacoes || "—"}`,
+        `Participante: ${participante.nome}`,
+        `Estágio na mentoria: ${participante.estagioMentoria || "—"}`,
+        `Observações da mentora sobre a participante: ${participante.observacoesMentora || "—"}`,
         "",
-        "Linha do tempo:",
+        "Casos clínicos acompanhados:",
+        ...hipotesesPorCaso.map(
+          ({ caso, hipoteses }) =>
+            `- ${caso.nome} (${caso.status}): objetivo "${caso.objetivo || "—"}". Hipóteses: ${
+              hipoteses.length
+                ? hipoteses.map((h) => `[${h.status}] ${h.texto}`).join(" | ")
+                : "nenhuma hipótese registrada ainda"
+            }`
+        ),
+        "",
+        "Linha do tempo da mentoria:",
         ...eventos.map((e) => `- [${e.criadoEm.slice(0, 10)}] (${e.tipo}) ${e.descricao}`),
         "",
-        "Conversas com o assistente:",
+        "Conversas com o agente (todos os casos):",
         ...msgs.map((m) => `- [${m.criadoEm.slice(0, 10)}] ${m.autor}: ${m.conteudo}`),
       ].join("\n");
       const texto = await chamarOpenRouter(
-        "Você redige, para uma psicopedagoga, um resumo da evolução de um cliente em acompanhamento. Use APENAS o material fornecido " +
-          "(linha do tempo e conversas) — nada externo. Não emita diagnóstico. Escreva 1 a 2 parágrafos em português do Brasil, tom " +
-          "profissional e objetivo: avanços observados, dificuldades que persistem e sugestão de foco para os próximos encontros.",
+        "Você prepara, para a mentora de um programa de formação em raciocínio clínico, um resumo pré-encontro sobre uma " +
+          "participante. Use APENAS o material fornecido — nada externo. Não emita diagnóstico sobre os casos clínicos da " +
+          "participante. Estruture a resposta em: (1) principais hipóteses formuladas por ela e o status de cada uma; " +
+          "(2) pontos ainda frágeis no raciocínio; (3) dúvidas recorrentes nas conversas; (4) 2-3 questões sugeridas para " +
+          "discutir no encontro. Português do Brasil, tom profissional e objetivo.",
         [{ role: "user", content: material }],
-        800,
+        900,
         settings.modelo || undefined
       );
-      if (texto) return await registrarResumo(clientId, texto);
+      if (texto) return await registrarResumo(participantId, texto);
     } catch {
       // cai no resumo determinístico
     }
   }
 
   // Resumo determinístico (modo demo)
-  const nConversas = new Set(msgs.map((m) => m.criadoEm.slice(0, 10))).size;
-  const perguntas = msgs.filter((m) => m.papel === "usuario").map((m) => m.conteudo);
-  const temas = temasFrequentes(perguntas.join(" "));
-  const ultimos = eventos.slice(-3).map((e) => e.descricao);
+  const totalHipoteses = hipotesesPorCaso.reduce((acc, h) => acc + h.hipoteses.length, 0);
+  const ativas = hipotesesPorCaso.flatMap((h) => h.hipoteses.filter((x) => x.status === "ativa"));
+  const casosAtivos = casos.filter((c) => c.status === "ativo");
   const texto =
-    `Nas últimas interações registradas (${msgs.length} mensagens em ${nConversas || 1} dia(s) de conversa e ${eventos.length} evento(s) na linha do tempo), ` +
-    `${cli.nome} trouxe principalmente temas ligados a ${temas.length ? temas.join(", ") : "o objetivo do acompanhamento"}. ` +
-    (ultimos.length ? `Registros recentes: ${ultimos.join(" ")} ` : "") +
-    `O objetivo vigente é: ${cli.objetivo || "ainda não definido"}. ` +
-    `Sugere-se revisar esses pontos no próximo encontro e atualizar as observações do acompanhamento.`;
-  return await registrarResumo(clientId, texto);
+    `${participante.nome} está no estágio "${participante.estagioMentoria || "não definido"}" da mentoria, com ${casosAtivos.length} caso(s) ativo(s) ` +
+    `e ${totalHipoteses} hipótese(s) registrada(s) no total (${ativas.length} ainda ativa(s), sem confirmação ou descarte). ` +
+    (ativas.length ? `Hipóteses em aberto: ${ativas.map((h) => `"${h.texto}"`).join("; ")}. ` : "") +
+    `Foram ${msgs.length} mensagens trocadas com o agente ao longo do acompanhamento. ` +
+    `Sugestão de pauta para o encontro: revisar as hipóteses ainda ativas e decidir, para cada uma, se há evidência suficiente para confirmar, descartar ou se ainda falta coletar dado.`;
+  return await registrarResumo(participantId, texto);
 }
 
-async function registrarResumo(clientId: number, texto: string): Promise<string> {
-  await logEvent(clientId, "resumo", "Resumo da evolução gerado pela mentora.");
+async function registrarResumo(participantId: number, texto: string): Promise<string> {
+  await logEvent(participantId, null, "resumo", "Resumo pré-encontro gerado pela mentora.");
   return texto;
-}
-
-function temasFrequentes(texto: string): string[] {
-  const contagem = new Map<string, number>();
-  for (const t of tokens(texto)) contagem.set(t, (contagem.get(t) ?? 0) + 1);
-  return [...contagem.entries()]
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 3)
-    .map(([t]) => t);
 }

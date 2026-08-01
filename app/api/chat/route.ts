@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getClient, getConversationClientId } from "@/lib/data";
+import { getCase, getConversationContext } from "@/lib/data";
 import { getCurrentUser } from "@/lib/auth";
 import { responder, salvarConversa } from "@/lib/assistente";
 
@@ -7,33 +7,42 @@ export async function POST(req: Request) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Não autenticado." }, { status: 401 });
 
-  const body = (await req.json()) as { pergunta?: string; clientId?: number; conversationId?: number };
+  const body = (await req.json()) as { pergunta?: string; caseId?: number; conversationId?: number };
   const pergunta = body.pergunta?.trim();
-  if (!pergunta) return NextResponse.json({ error: "Escreva uma pergunta." }, { status: 400 });
+  if (!pergunta) return NextResponse.json({ error: "Escreva sua mensagem." }, { status: 400 });
 
-  // Isolamento: cliente só conversa no próprio contexto; mentora escolhe o cliente
-  let clientId: number | null = null;
-  let cliente = null;
-  if (user.papel === "cliente") {
-    clientId = user.clientId;
-    cliente = clientId ? await getClient(clientId) : null;
-  } else if (body.clientId) {
-    cliente = await getClient(body.clientId);
-    if (!cliente) return NextResponse.json({ error: "Cliente não encontrado." }, { status: 404 });
-    clientId = body.clientId;
+  // Isolamento: participante só conversa no próprio contexto; mentora escolhe a participante/caso
+  let participantId: number | null = null;
+  if (user.papel === "participante") {
+    participantId = user.participantId;
+  } else {
+    // Mentora precisa indicar o caso (que já resolve a participante dona dele)
+    if (!body.caseId) return NextResponse.json({ error: "Selecione um caso para conversar." }, { status: 400 });
   }
 
-  const resposta = await responder(pergunta, clientId, cliente?.nome ?? user.nome);
+  let caseId: number | null = body.caseId ?? null;
+  let nomeCaso: string | null = null;
+  if (caseId) {
+    const caso = await getCase(caseId);
+    if (!caso) return NextResponse.json({ error: "Caso não encontrado." }, { status: 404 });
+    if (user.papel === "participante" && caso.participantId !== user.participantId) {
+      return NextResponse.json({ error: "Sem acesso a este caso." }, { status: 403 });
+    }
+    if (user.papel === "mentora") participantId = caso.participantId;
+    nomeCaso = caso.nome;
+  }
+
+  if (!participantId) return NextResponse.json({ error: "Não foi possível identificar a participante." }, { status: 400 });
+
+  const resposta = await responder(pergunta, participantId, caseId, user.nome, nomeCaso);
 
   // Toda conversa é armazenada para consulta futura (regra do produto)
   let conversationId = body.conversationId;
-  if (clientId) {
-    if (conversationId) {
-      const dono = await getConversationClientId(conversationId);
-      if (dono !== clientId) conversationId = undefined;
-    }
-    conversationId = await salvarConversa(clientId, user.nome, pergunta, resposta, conversationId);
+  if (conversationId) {
+    const contexto = await getConversationContext(conversationId);
+    if (!contexto || contexto.participantId !== participantId || contexto.caseId !== caseId) conversationId = undefined;
   }
+  conversationId = await salvarConversa(participantId, caseId, user.nome, pergunta, resposta, conversationId);
 
   return NextResponse.json({ ...resposta, conversationId });
 }

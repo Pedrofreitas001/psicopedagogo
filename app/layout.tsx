@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Espaço Aprender — Acompanhamento Psicopedagógico",
-  description: "Plataforma de acompanhamento psicopedagógico: biblioteca, jornada do cliente e assistente de estudos.",
+  title: "Comunicar & Aprender — Mentoria de Raciocínio Clínico",
+  description: "Mentoria de raciocínio clínico em compreensão leitora: protocolo, hipóteses e um mentor de IA socrático para cada caso.",
 };
 
 export const dynamic = "force-dynamic";

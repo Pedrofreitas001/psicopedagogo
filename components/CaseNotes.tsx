@@ -14,8 +14,8 @@ function dataBr(iso: string): string {
   return `${d}/${m}/${y}`;
 }
 
-/** Prontuário: notas de sessão datadas — o registro clínico do acompanhamento. */
-export default function SessionNotes({ clienteId, notas }: { clienteId: number; notas: Nota[] }) {
+/** Registros de raciocínio clínico datados por caso — o que a participante observou, testou e concluiu ao longo do tempo. */
+export default function CaseNotes({ caseId, notas }: { caseId: number; notas: Nota[] }) {
   const router = useRouter();
   const [aberto, setAberto] = useState(false);
   const [data, setData] = useState(hoje());
@@ -27,7 +27,7 @@ export default function SessionNotes({ clienteId, notas }: { clienteId: number; 
     e.preventDefault();
     setLoading(true);
     setErro(null);
-    const res = await fetch(`/api/clientes/${clienteId}/notas`, {
+    const res = await fetch(`/api/casos/${caseId}/notas`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ dataSessao: data, conteudo }),
@@ -35,7 +35,7 @@ export default function SessionNotes({ clienteId, notas }: { clienteId: number; 
     const body = await res.json().catch(() => ({}));
     setLoading(false);
     if (!res.ok) {
-      setErro(body.error ?? "Não foi possível salvar a nota.");
+      setErro(body.error ?? "Não foi possível salvar o registro.");
       return;
     }
     setConteudo("");
@@ -52,10 +52,12 @@ export default function SessionNotes({ clienteId, notas }: { clienteId: number; 
   return (
     <div>
       <div className="flex items-center justify-between">
-        <h2 className="flex items-center gap-2 text-[15px] font-semibold"><span className="material-symbols-outlined text-[20px] text-[var(--brand)]">history_edu</span> Prontuário — Sessões</h2>
+        <h2 className="flex items-center gap-2 text-[15px] font-semibold">
+          <span className="material-symbols-outlined text-[20px] text-[var(--brand)]">history_edu</span> Registros de raciocínio clínico
+        </h2>
         {!aberto && (
           <button onClick={() => setAberto(true)} className="rounded-lg bg-[var(--brand)] hover:bg-[var(--brand-deep)] text-white px-4 py-2 text-sm font-medium">
-            + Nova nota de sessão
+            + Novo registro
           </button>
         )}
       </div>
@@ -63,12 +65,19 @@ export default function SessionNotes({ clienteId, notas }: { clienteId: number; 
       {aberto && (
         <form onSubmit={salvar} className="mt-3 rounded-xl border border-[var(--grid)] bg-[var(--surface-low)] p-4 space-y-3">
           <label className="text-sm block">
-            <span className="text-[var(--ink-2)]">Data da sessão</span>
+            <span className="text-[var(--ink-2)]">Data</span>
             <input type="date" value={data} onChange={(e) => setData(e.target.value)} required className="mt-1 rounded-lg border border-black/10 bg-white px-2.5 py-2 text-sm" />
           </label>
           <label className="text-sm block">
-            <span className="text-[var(--ink-2)]">Registro da sessão</span>
-            <textarea rows={4} value={conteudo} onChange={(e) => setConteudo(e.target.value)} required className="mt-1 w-full rounded-lg border border-black/10 bg-white px-2.5 py-2 text-sm" placeholder="O que foi trabalhado, como o cliente respondeu, combinados para a próxima sessão…" />
+            <span className="text-[var(--ink-2)]">O que foi observado, testado ou concluído</span>
+            <textarea
+              rows={4}
+              value={conteudo}
+              onChange={(e) => setConteudo(e.target.value)}
+              required
+              className="mt-1 w-full rounded-lg border border-black/10 bg-white px-2.5 py-2 text-sm"
+              placeholder="O que você observou nesta etapa, o que isso confirma ou contradiz, e o que ainda falta investigar…"
+            />
           </label>
           {erro && <p className="text-[13px] text-red-600">{erro}</p>}
           <div className="flex gap-2">
@@ -95,7 +104,7 @@ export default function SessionNotes({ clienteId, notas }: { clienteId: number; 
             <p className="mt-1.5 text-[11px] text-[var(--ink-muted)]">registrado por {n.criadoPor}</p>
           </div>
         ))}
-        {notas.length === 0 && <p className="mt-2 text-sm text-[var(--ink-muted)]">Nenhuma sessão registrada ainda.</p>}
+        {notas.length === 0 && <p className="mt-2 text-sm text-[var(--ink-muted)]">Nenhum registro ainda.</p>}
       </div>
     </div>
   );

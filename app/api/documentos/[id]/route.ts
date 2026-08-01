@@ -1,12 +1,14 @@
 import { NextResponse } from "next/server";
-import { getDocument, updateDocument, deleteDocument } from "@/lib/data";
+import { getDocument, getCase, updateDocument, deleteDocument } from "@/lib/data";
 import { getCurrentUser } from "@/lib/auth";
 import { lerArquivoLocal, urlDeDownload } from "@/lib/storage";
 
-function podeAcessar(doc: { categoriaId: number | null; clientId: number | null }, papel: string, clientId: number | null): boolean {
+async function podeAcessar(doc: { categoriaId: number | null; caseId: number | null }, papel: string, participantId: number | null): Promise<boolean> {
   if (papel === "mentora") return true;
   if (doc.categoriaId) return true; // biblioteca é compartilhada
-  return doc.clientId !== null && doc.clientId === clientId; // isolamento por cliente
+  if (doc.caseId === null) return false;
+  const caso = await getCase(doc.caseId);
+  return !!caso && caso.participantId === participantId; // isolamento por caso da participante
 }
 
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -16,7 +18,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   const { id } = await params;
   const doc = await getDocument(Number(id));
   if (!doc) return NextResponse.json({ error: "Documento não encontrado." }, { status: 404 });
-  if (!podeAcessar(doc, user.papel, user.clientId)) {
+  if (!(await podeAcessar(doc, user.papel, user.participantId))) {
     return NextResponse.json({ error: "Sem acesso a este documento." }, { status: 403 });
   }
 

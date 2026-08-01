@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 
 type Valores = {
   nome: string;
-  email: string;
   idade: number | null;
   escolaSerie: string;
   queixaPrincipal: string;
@@ -18,7 +17,6 @@ type Valores = {
 
 const VAZIO: Valores = {
   nome: "",
-  email: "",
   idade: null,
   escolaSerie: "",
   queixaPrincipal: "",
@@ -29,8 +27,11 @@ const VAZIO: Valores = {
   observacoes: "",
 };
 
-/** Cria (sem `clienteId`) ou edita (com `clienteId`) um cliente — ficha de acolhimento. */
-export default function ClienteForm({ clienteId, valores }: { clienteId?: number; valores?: Valores }) {
+/**
+ * Cria (com `participantId`, sem `caseId`) ou edita (com `caseId`) um caso
+ * clínico — a criança que a participante atende fora da plataforma.
+ */
+export default function CaseForm({ participantId, caseId, valores }: { participantId?: number; caseId?: number; valores?: Valores }) {
   const router = useRouter();
   const [aberto, setAberto] = useState(false);
   const [v, setV] = useState<Valores>(valores ?? VAZIO);
@@ -41,8 +42,8 @@ export default function ClienteForm({ clienteId, valores }: { clienteId?: number
     e.preventDefault();
     setLoading(true);
     setErro(null);
-    const res = await fetch(clienteId ? `/api/clientes/${clienteId}` : "/api/clientes", {
-      method: clienteId ? "PATCH" : "POST",
+    const res = await fetch(caseId ? `/api/casos/${caseId}` : `/api/participantes/${participantId}/casos`, {
+      method: caseId ? "PATCH" : "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(v),
     });
@@ -53,6 +54,7 @@ export default function ClienteForm({ clienteId, valores }: { clienteId?: number
       return;
     }
     setAberto(false);
+    if (!caseId && data.id) router.push(`/casos/${data.id}`);
     router.refresh();
   }
 
@@ -61,12 +63,12 @@ export default function ClienteForm({ clienteId, valores }: { clienteId?: number
       <button
         onClick={() => setAberto(true)}
         className={
-          clienteId
+          caseId
             ? "text-[13px] text-[var(--brand-deep)] hover:underline"
             : "rounded-lg bg-[var(--brand)] hover:bg-[var(--brand-deep)] text-white px-4 py-2 text-sm font-medium"
         }
       >
-        {clienteId ? "Editar" : "+ Novo cliente"}
+        {caseId ? "Editar" : "+ Novo caso clínico"}
       </button>
     );
   }
@@ -80,12 +82,8 @@ export default function ClienteForm({ clienteId, valores }: { clienteId?: number
         <p className="text-[12px] font-semibold uppercase tracking-wide text-[var(--ink-muted)] mb-2">Identificação</p>
         <div className="grid grid-cols-2 gap-3">
           <label className="text-sm block col-span-2">
-            <span className={label}>Nome</span>
-            <input className={input} value={v.nome} onChange={(e) => setV({ ...v, nome: e.target.value })} required />
-          </label>
-          <label className="text-sm block">
-            <span className={label}>Email (para o acesso do cliente)</span>
-            <input type="email" className={input} value={v.email} onChange={(e) => setV({ ...v, email: e.target.value })} />
+            <span className={label}>Nome ou iniciais</span>
+            <input className={input} value={v.nome} onChange={(e) => setV({ ...v, nome: e.target.value })} placeholder="Ex.: L.F. (use iniciais se preferir preservar a identidade)" required />
           </label>
           <label className="text-sm block">
             <span className={label}>Idade</span>
@@ -98,7 +96,7 @@ export default function ClienteForm({ clienteId, valores }: { clienteId?: number
               onChange={(e) => setV({ ...v, idade: e.target.value === "" ? null : Number(e.target.value) })}
             />
           </label>
-          <label className="text-sm block col-span-2">
+          <label className="text-sm block">
             <span className={label}>Escola / série</span>
             <input className={input} value={v.escolaSerie} onChange={(e) => setV({ ...v, escolaSerie: e.target.value })} />
           </label>
@@ -132,10 +130,10 @@ export default function ClienteForm({ clienteId, valores }: { clienteId?: number
       </div>
 
       <div>
-        <p className="text-[12px] font-semibold uppercase tracking-wide text-[var(--ink-muted)] mb-2">Acompanhamento</p>
+        <p className="text-[12px] font-semibold uppercase tracking-wide text-[var(--ink-muted)] mb-2">Análise clínica</p>
         <label className="text-sm block mb-3">
-          <span className={label}>Objetivo do acompanhamento</span>
-          <textarea rows={2} className={input} value={v.objetivo} onChange={(e) => setV({ ...v, objetivo: e.target.value })} />
+          <span className={label}>Objetivo da análise</span>
+          <textarea rows={2} className={input} value={v.objetivo} onChange={(e) => setV({ ...v, objetivo: e.target.value })} placeholder="O que você está tentando entender ou decidir sobre este caso?" />
         </label>
         <label className="text-sm block">
           <span className={label}>Observações</span>

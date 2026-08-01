@@ -1,34 +1,45 @@
--- Mockup de demonstração: cliente fictício "Thiago" + biblioteca de exemplo,
--- para testar pastas, prontuário e o assistente sem preencher tudo na mão.
+-- Mockup de demonstração: participante fictícia "Beatriz" com um caso clínico
+-- "Thiago" + biblioteca de exemplo, para testar pastas, protocolo, hipóteses
+-- e o agente sem preencher tudo na mão.
 -- Idempotente (seguro rodar mais de uma vez — verifica antes de inserir).
--- Rode no SQL Editor do Supabase depois de aplicar schema.sql/migration_v1.sql.
+-- Rode no SQL Editor do Supabase depois de aplicar schema.sql (ou
+-- migration_v1.sql + migration_v2.sql + migration_v3.sql, num projeto existente).
 --
 -- Os documentos aqui não têm arquivo binário real no Storage (só o registro
--- e o resumo de conteúdo, que é o que o assistente usa) — o link de download
+-- e o resumo de conteúdo, que é o que o agente usa) — o link de download
 -- mostra "arquivo sem binário". Se quiser o download funcionando, reenvie o
 -- PDF de verdade pela própria Biblioteca (o nome pode ficar igual).
 
 do $$
 declare
-  v_client_id bigint;
+  v_participant_id bigint;
+  v_case_id bigint;
   v_cat_avaliacao bigint;
   v_cat_eoca bigint;
   v_cat_intervencao bigint;
   v_cat_leitura bigint;
 begin
-  -- Cliente
-  select id into v_client_id from clients where nome = 'Thiago' and workspace_id = 1 limit 1;
-  if v_client_id is null then
-    insert into clients (
-      workspace_id, nome, email, idade, escola_serie, queixa_principal,
+  -- Participante
+  select id into v_participant_id from participants where nome = 'Beatriz (demo)' and workspace_id = 1 limit 1;
+  if v_participant_id is null then
+    insert into participants (workspace_id, nome, email, estagio_mentoria, observacoes_mentora)
+    values (1, 'Beatriz (demo)', '', 'Módulo 1 — Fundamentos do raciocínio clínico', 'Participante fictícia criada para testar a plataforma.')
+    returning id into v_participant_id;
+  end if;
+
+  -- Caso clínico
+  select id into v_case_id from clinical_cases where nome = 'Thiago (demo)' and participant_id = v_participant_id limit 1;
+  if v_case_id is null then
+    insert into clinical_cases (
+      workspace_id, participant_id, nome, idade, escola_serie, queixa_principal,
       diagnostico_preliminar, responsavel_nome, responsavel_contato, objetivo, observacoes
     ) values (
-      1, 'Thiago', '', 8, '3º ano — Escola Estadual (mock)',
+      1, v_participant_id, 'Thiago (demo)', 8, '3º ano — Escola Estadual (mock)',
       'Dificuldade de leitura e baixa concentração em sala de aula, relatada pela professora.',
       'Em avaliação inicial (EOCA aplicada)', 'Fernanda (mãe)', '(11) 90000-0003',
-      'Realizar avaliação psicopedagógica inicial e iniciar intervenção conforme a necessidade identificada.',
-      'Cliente fictício criado para testar a plataforma.'
-    ) returning id into v_client_id;
+      'Realizar avaliação psicopedagógica inicial e identificar hipótese clínica consistente.',
+      'Caso fictício criado para testar a plataforma.'
+    ) returning id into v_case_id;
   end if;
 
   -- Pastas: Avaliação Inicial → EOCA · Intervenção → Leitura e Escrita
@@ -79,21 +90,35 @@ $doc1$, true, 'Mariana Duarte');
       true, 'Mariana Duarte');
   end if;
 
-  -- Prontuário: uma nota de sessão de exemplo
-  if not exists (select 1 from session_notes where client_id = v_client_id) then
-    insert into session_notes (workspace_id, client_id, data_sessao, conteudo, criado_por)
-    values (1, v_client_id, current_date - 2,
+  -- Registro de raciocínio clínico de exemplo
+  if not exists (select 1 from case_notes where case_id = v_case_id) then
+    insert into case_notes (workspace_id, case_id, data_sessao, conteudo, criado_por)
+    values (1, v_case_id, current_date - 2,
       'Aplicação da EOCA: Thiago explorou os materiais com iniciativa, verbalizou bem e conversou sem constrangimento. Demonstrou baixa tolerância à frustração diante de tarefas de escrita, preferindo desenho e massa de modelar. Leitura silabada, com omissão de letras. Combinado: aplicar Teste de Consciência Fonológica na próxima sessão.',
-      'Mariana Duarte');
+      'Beatriz (demo)');
+  end if;
+
+  -- Hipótese clínica de exemplo
+  if not exists (select 1 from hypotheses where case_id = v_case_id) then
+    insert into hypotheses (workspace_id, case_id, texto, status, evidencias_favor, evidencias_contra)
+    values (1, v_case_id,
+      'A dificuldade de leitura de Thiago está mais ligada a baixa tolerância à frustração e evitação de tarefas de escrita do que a um déficit de decodificação em si.',
+      'ativa',
+      'Leitura silabada mas com iniciativa e boa verbalização na EOCA; prefere tarefas sem registro escrito.',
+      'Ainda não foi aplicado o Teste de Consciência Fonológica — pode revelar um componente fonológico real.');
   end if;
 
   -- Linha do tempo
-  if not exists (select 1 from events where client_id = v_client_id and tipo = 'sessao') then
-    insert into events (workspace_id, client_id, tipo, descricao, criado_em)
-    values (1, v_client_id, 'sessao', 'Mentora registrou uma nota de sessão (EOCA).', now() - interval '2 days');
+  if not exists (select 1 from events where case_id = v_case_id and tipo = 'sessao') then
+    insert into events (workspace_id, participant_id, case_id, tipo, descricao, criado_em)
+    values (1, v_participant_id, v_case_id, 'sessao', 'Beatriz registrou um raciocínio clínico (EOCA).', now() - interval '2 days');
   end if;
-  if not exists (select 1 from events where client_id = v_client_id and tipo = 'material') then
-    insert into events (workspace_id, client_id, tipo, descricao, criado_em)
-    values (1, v_client_id, 'material', 'Mentora vinculou o protocolo EOCA à biblioteca.', now() - interval '3 days');
+  if not exists (select 1 from events where case_id = v_case_id and tipo = 'material') then
+    insert into events (workspace_id, participant_id, case_id, tipo, descricao, criado_em)
+    values (1, v_participant_id, v_case_id, 'material', 'Mentora vinculou o protocolo EOCA à biblioteca.', now() - interval '3 days');
+  end if;
+  if not exists (select 1 from events where case_id = v_case_id and tipo = 'hipotese') then
+    insert into events (workspace_id, participant_id, case_id, tipo, descricao, criado_em)
+    values (1, v_participant_id, v_case_id, 'hipotese', 'Beatriz registrou uma nova hipótese clínica.', now() - interval '1 days');
   end if;
 end $$;

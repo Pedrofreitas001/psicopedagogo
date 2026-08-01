@@ -6,13 +6,13 @@ import { useRouter } from "next/navigation";
 /** Fluxo do produto: Novo documento → Categoria → Salvar. */
 export default function UploadForm({
   categorias,
-  clientId,
+  caseId,
   comConteudo = true,
 }: {
   /** Upload para a biblioteca (mentora): escolhe a pasta */
   categorias?: { id: number; nome: string }[];
-  /** Upload para os arquivos de um cliente */
-  clientId?: number;
+  /** Upload para os arquivos de um caso clínico */
+  caseId?: number;
   comConteudo?: boolean;
 }) {
   const router = useRouter();
@@ -31,7 +31,7 @@ export default function UploadForm({
     const form = new FormData();
     form.set("arquivo", arquivo);
     if (categoria) form.set("categoriaId", categoria);
-    if (clientId) form.set("clientId", String(clientId));
+    if (caseId) form.set("caseId", String(caseId));
     if (conteudo.trim()) form.set("conteudo", conteudo.trim());
     const res = await fetch("/api/documentos", { method: "POST", body: form });
     const data = await res.json().catch(() => ({}));

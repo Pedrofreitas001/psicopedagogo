@@ -9,10 +9,10 @@ import {
   setUserAuthId,
   hasAnyAuthedUser,
   createUser,
-  getClientByUserId,
-  getClientByEmail,
-  linkClientUser,
-  createClientForUser,
+  getParticipantByUserId,
+  getParticipantByEmail,
+  linkParticipantUser,
+  createParticipantForUser,
 } from "./data";
 import { authEnabled, getAuthUser, parseSessionCookie, SESSION_COOKIE } from "./supabase-auth";
 
@@ -23,10 +23,10 @@ import { authEnabled, getAuthUser, parseSessionCookie, SESSION_COOKIE } from "./
  * access token validado no Supabase a cada request. Provisionamento no
  * primeiro login:
  *   - email igual ao de um usuário semeado → herda aquele papel;
- *   - email igual ao de um cliente cadastrado pela mentora → entra como
- *     cliente e é vinculado àquele registro;
+ *   - email igual ao de uma participante cadastrada pela mentora → entra como
+ *     participante e é vinculada àquele registro;
  *   - primeiro login real do workspace → mentora;
- *   - demais → cliente (com registro de cliente criado automaticamente).
+ *   - demais → participante (com registro de participante criado automaticamente).
  *
  * DEMO (sem env vars, dev local): seletor de usuário por cookie `uid`.
  */
@@ -36,13 +36,13 @@ export type CurrentUser = {
   nome: string;
   email: string;
   papel: Role;
-  /** id em `clients` quando o papel é cliente */
-  clientId: number | null;
+  /** id em `participants` quando o papel é participante */
+  participantId: number | null;
 };
 
-async function withClientId(user: { id: number; nome: string; email: string; papel: Role }): Promise<CurrentUser> {
-  const client = user.papel === "cliente" ? await getClientByUserId(user.id) : null;
-  return { ...user, clientId: client?.id ?? null };
+async function withParticipantId(user: { id: number; nome: string; email: string; papel: Role }): Promise<CurrentUser> {
+  const participante = user.papel === "participante" ? await getParticipantByUserId(user.id) : null;
+  return { ...user, participantId: participante?.id ?? null };
 }
 
 export const getCurrentUser = cache(async (): Promise<CurrentUser | null> => {
@@ -52,7 +52,7 @@ export const getCurrentUser = cache(async (): Promise<CurrentUser | null> => {
     const uid = parseInt(store.get("uid")?.value ?? "1") || 1;
     const user = (await getUserById(uid)) ?? (await getFirstUser());
     if (!user) return null;
-    return withClientId(user);
+    return withParticipantId(user);
   }
 
   const session = parseSessionCookie(store.get(SESSION_COOKIE)?.value);
@@ -60,7 +60,7 @@ export const getCurrentUser = cache(async (): Promise<CurrentUser | null> => {
   const authUser = await getAuthUser(session.at);
   if (!authUser) return null;
 
-  // Provisionamento: auth_id → email semeado → cliente cadastrado → novo usuário
+  // Provisionamento: auth_id → email semeado → participante cadastrada → novo usuário
   let user = await getUserByAuthId(authUser.id);
   if (!user) {
     const byEmail = await getUserByEmail(authUser.email);
@@ -69,20 +69,20 @@ export const getCurrentUser = cache(async (): Promise<CurrentUser | null> => {
       user = byEmail;
     } else {
       const primeiroReal = !(await hasAnyAuthedUser());
-      const clienteExistente = await getClientByEmail(authUser.email);
-      const papel: Role = primeiroReal ? "mentora" : "cliente";
+      const participanteExistente = await getParticipantByEmail(authUser.email);
+      const papel: Role = primeiroReal ? "mentora" : "participante";
       const userId = await createUser({ nome: authUser.nome, email: authUser.email, papel, authId: authUser.id });
-      if (papel === "cliente") {
-        if (clienteExistente) {
-          await linkClientUser(clienteExistente.id, userId);
+      if (papel === "participante") {
+        if (participanteExistente) {
+          await linkParticipantUser(participanteExistente.id, userId);
         } else {
-          await createClientForUser({ userId, nome: authUser.nome, email: authUser.email });
+          await createParticipantForUser({ userId, nome: authUser.nome, email: authUser.email });
         }
       }
       user = { id: userId, nome: authUser.nome, email: authUser.email, papel };
     }
   }
-  return withClientId(user);
+  return withParticipantId(user);
 });
 
 /** Garante que o usuário atual é a mentora; lança para uso em rotas de API. */

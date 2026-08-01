@@ -17,13 +17,13 @@ type Respostas = Record<number, ValorCampo>;
 
 export default function ProtocolForm({
   assignmentId,
-  clientId,
+  caseId,
   protocolo,
   respostasIniciais,
   status,
 }: {
   assignmentId: number;
-  clientId: number;
+  caseId: number;
   protocolo: Protocolo;
   respostasIniciais: { fieldId: number; valor: ValorCampo }[];
   status: "em_andamento" | "concluido";
@@ -75,7 +75,7 @@ export default function ProtocolForm({
   async function excluir() {
     if (!confirm(`Excluir esta aplicação de "${protocolo.nome}"? As respostas registradas serão perdidas.`)) return;
     await fetch(`/api/protocolos/assignments/${assignmentId}`, { method: "DELETE" });
-    router.push(`/clientes/${clientId}`);
+    router.push(`/casos/${caseId}`);
     router.refresh();
   }
 

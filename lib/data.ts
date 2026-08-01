@@ -12,13 +12,18 @@ import { PROTOCOLOS_BUILTIN, type CampoTipo, type TabelaConfig } from "./protoco
  *     rodar sem infraestrutura externa; em serverless (Vercel) NÃO persiste de
  *     forma confiável entre instâncias, por isso nunca deve ser usado em produção.
  *
+ * Modelo do domínio: uma "participante" é a psicopedagoga em formação na
+ * mentoria; cada participante acompanha um ou mais "casos clínicos" (as
+ * crianças que ela atende fora da plataforma); protocolo, hipóteses e
+ * registros de raciocínio clínico pertencem ao caso, não à participante.
+ *
  * Toda a autorização (quem pode ver/editar o quê) continua sendo feita nas
  * rotas de API — aqui usamos a service_role key, que ignora RLS por design;
  * o RLS em supabase/schema.sql é defesa em profundidade, não a fronteira
  * principal de autorização deste app.
  */
 
-export type Role = "mentora" | "cliente";
+export type Role = "mentora" | "participante";
 
 export function postgresEnabled(): boolean {
   return !!(supabaseUrl() && process.env.SUPABASE_SERVICE_ROLE_KEY);
@@ -71,33 +76,44 @@ const b = (v: unknown): boolean => v === true || v === 1 || v === "t";
 
 export type UserRow = { id: number; nome: string; email: string; papel: Role };
 
-export type Client = {
+export type Participant = {
   id: number;
   userId: number | null;
   nome: string;
   email: string;
-  objetivo: string;
-  observacoes: string;
-  idade: number | null;
-  diagnosticoPreliminar: string;
-  escolaSerie: string;
-  responsavelNome: string;
-  responsavelContato: string;
-  queixaPrincipal: string;
+  estagioMentoria: string;
+  observacoesMentora: string;
   criadoEm: string;
 };
 
-export type ClientInput = {
+export type ParticipantInput = { nome: string; email: string; estagioMentoria: string; observacoesMentora: string };
+
+export type ClinicalCase = {
+  id: number;
+  participantId: number;
   nome: string;
-  email: string;
-  objetivo: string;
-  observacoes: string;
   idade: number | null;
   diagnosticoPreliminar: string;
   escolaSerie: string;
   responsavelNome: string;
   responsavelContato: string;
   queixaPrincipal: string;
+  objetivo: string;
+  observacoes: string;
+  status: "ativo" | "encerrado";
+  criadoEm: string;
+};
+
+export type ClinicalCaseInput = {
+  nome: string;
+  idade: number | null;
+  diagnosticoPreliminar: string;
+  escolaSerie: string;
+  responsavelNome: string;
+  responsavelContato: string;
+  queixaPrincipal: string;
+  objetivo: string;
+  observacoes: string;
 };
 
 export type Category = { id: number; nome: string; parentId: number | null };
@@ -105,7 +121,7 @@ export type Category = { id: number; nome: string; parentId: number | null };
 export type DocumentRow = {
   id: number;
   categoriaId: number | null;
-  clientId: number | null;
+  caseId: number | null;
   nome: string;
   tipo: string;
   tamanho: number;
@@ -120,9 +136,20 @@ export type KnowledgeNote = { id: number; titulo: string; conteudo: string; atua
 
 export type EventRow = { tipo: string; descricao: string; criadoEm: string };
 
-export type SessionNote = { id: number; clientId: number; dataSessao: string; conteudo: string; criadoPor: string; criadoEm: string };
+export type CaseNote = { id: number; caseId: number; dataSessao: string; conteudo: string; criadoPor: string; criadoEm: string };
 
 export type MessageRow = { papel: "usuario" | "assistente"; autor: string; conteudo: string; criadoEm: string };
+
+export type Hypothesis = {
+  id: number;
+  caseId: number;
+  texto: string;
+  status: "ativa" | "confirmada" | "descartada";
+  evidenciasFavor: string;
+  evidenciasContra: string;
+  criadoEm: string;
+  atualizadoEm: string;
+};
 
 export type AgentSettings = {
   usaBiblioteca: boolean;
@@ -146,7 +173,7 @@ export type ProtocolSummary = { id: number; nome: string; descricao: string; ver
 
 export type ProtocolAssignment = {
   id: number;
-  clientId: number;
+  caseId: number;
   protocolId: number;
   protocolNome: string;
   dataAplicacao: string;
@@ -177,7 +204,7 @@ export async function listUsers(): Promise<UserRow[]> {
 export async function getWorkspaceName(): Promise<string> {
   if (postgresEnabled()) {
     const rows = await pgSelect<{ nome: string }>("workspaces", "select=nome&id=eq.1&limit=1");
-    return rows[0]?.nome ?? "Espaço Aprender";
+    return rows[0]?.nome ?? "Comunicar & Aprender";
   }
   return (getDb().prepare("SELECT nome FROM workspaces WHERE id = 1").get() as { nome: string }).nome;
 }
@@ -258,155 +285,280 @@ export async function createUser(input: { nome: string; email: string; papel: Ro
   return Number(info.lastInsertRowid);
 }
 
-export async function getClientByUserId(userId: number): Promise<{ id: number } | null> {
+export async function getParticipantByUserId(userId: number): Promise<{ id: number } | null> {
   if (postgresEnabled()) {
-    const rows = await pgSelect<{ id: unknown }>("clients", `select=id&user_id=eq.${userId}&workspace_id=eq.1&limit=1`);
+    const rows = await pgSelect<{ id: unknown }>("participants", `select=id&user_id=eq.${userId}&workspace_id=eq.1&limit=1`);
     return rows[0] ? { id: n(rows[0].id) } : null;
   }
-  return (getDb().prepare("SELECT id FROM clients WHERE user_id = ? AND workspace_id = 1").get(userId) as { id: number } | undefined) ?? null;
+  return (getDb().prepare("SELECT id FROM participants WHERE user_id = ? AND workspace_id = 1").get(userId) as { id: number } | undefined) ?? null;
 }
 
-export async function getClientByEmail(email: string): Promise<{ id: number } | null> {
+export async function getParticipantByEmail(email: string): Promise<{ id: number } | null> {
   const lower = email.toLowerCase();
   if (postgresEnabled()) {
-    const rows = await pgSelect<{ id: unknown; email: string }>("clients", "select=id,email&workspace_id=eq.1");
+    const rows = await pgSelect<{ id: unknown; email: string }>("participants", "select=id,email&workspace_id=eq.1");
     const match = rows.find((r) => r.email.toLowerCase() === lower);
     return match ? { id: n(match.id) } : null;
   }
-  return (getDb().prepare("SELECT id FROM clients WHERE lower(email) = lower(?) AND workspace_id = 1").get(lower) as { id: number } | undefined) ?? null;
+  return (
+    (getDb().prepare("SELECT id FROM participants WHERE lower(email) = lower(?) AND workspace_id = 1").get(lower) as { id: number } | undefined) ??
+    null
+  );
 }
 
-export async function linkClientUser(clientId: number, userId: number): Promise<void> {
-  if (postgresEnabled()) return void (await pgUpdate("clients", clientId, { user_id: userId }));
-  getDb().prepare("UPDATE clients SET user_id = ? WHERE id = ?").run(userId, clientId);
+export async function linkParticipantUser(participantId: number, userId: number): Promise<void> {
+  if (postgresEnabled()) return void (await pgUpdate("participants", participantId, { user_id: userId }));
+  getDb().prepare("UPDATE participants SET user_id = ? WHERE id = ?").run(userId, participantId);
 }
 
-export async function createClientForUser(input: { userId: number; nome: string; email: string }): Promise<number> {
+export async function createParticipantForUser(input: { userId: number; nome: string; email: string }): Promise<number> {
   if (postgresEnabled()) {
-    const row = await pgInsert<{ id: unknown }>("clients", { workspace_id: 1, user_id: input.userId, nome: input.nome, email: input.email });
+    const row = await pgInsert<{ id: unknown }>("participants", { workspace_id: 1, user_id: input.userId, nome: input.nome, email: input.email });
     return n(row.id);
   }
   const info = getDb()
-    .prepare("INSERT INTO clients (workspace_id, user_id, nome, email) VALUES (1, ?, ?, ?)")
+    .prepare("INSERT INTO participants (workspace_id, user_id, nome, email) VALUES (1, ?, ?, ?)")
     .run(input.userId, input.nome, input.email);
   return Number(info.lastInsertRowid);
 }
 
 // ---------------------------------------------------------------------------
-// Clientes
+// Participantes
 // ---------------------------------------------------------------------------
 
-type ClientDbRow = {
+type ParticipantDbRow = {
   id: unknown;
   user_id: unknown;
   nome: string;
   email: string;
-  objetivo: string;
-  observacoes: string;
+  estagio_mentoria: string;
+  observacoes_mentora: string;
+  criado_em: string;
+};
+
+function mapParticipant(r: ParticipantDbRow): Participant {
+  return {
+    id: n(r.id),
+    userId: nOrNull(r.user_id),
+    nome: r.nome,
+    email: r.email,
+    estagioMentoria: r.estagio_mentoria ?? "",
+    observacoesMentora: r.observacoes_mentora ?? "",
+    criadoEm: r.criado_em,
+  };
+}
+
+const PARTICIPANT_COLS = "id,user_id,nome,email,estagio_mentoria,observacoes_mentora,criado_em";
+
+export async function listParticipants(): Promise<Participant[]> {
+  if (postgresEnabled()) {
+    const rows = await pgSelect<ParticipantDbRow>("participants", `select=${PARTICIPANT_COLS}&workspace_id=eq.1&order=nome.asc`);
+    return rows.map(mapParticipant);
+  }
+  return (getDb().prepare(`SELECT ${PARTICIPANT_COLS} FROM participants WHERE workspace_id = 1 ORDER BY nome`).all() as ParticipantDbRow[]).map(
+    mapParticipant
+  );
+}
+
+export async function listParticipantsWithLastEvent(): Promise<(Participant & { ultimoEvento: string | null })[]> {
+  const participantes = await listParticipants();
+  if (postgresEnabled()) {
+    const events = await pgSelect<{ participant_id: unknown; criado_em: string }>("events", "select=participant_id,criado_em&workspace_id=eq.1");
+    const last = new Map<number, string>();
+    for (const e of events) {
+      const pid = n(e.participant_id);
+      const prev = last.get(pid);
+      if (!prev || e.criado_em > prev) last.set(pid, e.criado_em);
+    }
+    return participantes.map((p) => ({ ...p, ultimoEvento: last.get(p.id) ?? null }));
+  }
+  const db = getDb();
+  return participantes.map((p) => {
+    const row = db.prepare("SELECT MAX(criado_em) m FROM events WHERE participant_id = ?").get(p.id) as { m: string | null };
+    return { ...p, ultimoEvento: row.m };
+  });
+}
+
+export async function getParticipant(id: number): Promise<Participant | null> {
+  if (postgresEnabled()) {
+    const rows = await pgSelect<ParticipantDbRow>("participants", `select=${PARTICIPANT_COLS}&id=eq.${id}&workspace_id=eq.1&limit=1`);
+    return rows[0] ? mapParticipant(rows[0]) : null;
+  }
+  const row = getDb().prepare(`SELECT ${PARTICIPANT_COLS} FROM participants WHERE id = ? AND workspace_id = 1`).get(id) as
+    | ParticipantDbRow
+    | undefined;
+  return row ? mapParticipant(row) : null;
+}
+
+function participantBody(input: ParticipantInput) {
+  return {
+    nome: input.nome.trim(),
+    email: input.email.trim().toLowerCase(),
+    estagio_mentoria: input.estagioMentoria ?? "",
+    observacoes_mentora: input.observacoesMentora ?? "",
+  };
+}
+
+export async function createParticipant(input: ParticipantInput): Promise<number> {
+  const body = participantBody(input);
+  if (postgresEnabled()) {
+    const row = await pgInsert<{ id: unknown }>("participants", { workspace_id: 1, ...body });
+    return n(row.id);
+  }
+  const info = getDb()
+    .prepare(`INSERT INTO participants (workspace_id, nome, email, estagio_mentoria, observacoes_mentora) VALUES (1, ?, ?, ?, ?)`)
+    .run(body.nome, body.email, body.estagio_mentoria, body.observacoes_mentora);
+  return Number(info.lastInsertRowid);
+}
+
+export async function updateParticipant(id: number, input: ParticipantInput): Promise<void> {
+  const body = participantBody(input);
+  if (postgresEnabled()) return void (await pgUpdate("participants", id, body));
+  getDb()
+    .prepare(`UPDATE participants SET nome=?, email=?, estagio_mentoria=?, observacoes_mentora=? WHERE id = ?`)
+    .run(body.nome, body.email, body.estagio_mentoria, body.observacoes_mentora, id);
+}
+
+export async function countParticipants(): Promise<number> {
+  if (postgresEnabled()) {
+    const rows = await pgSelect<{ id: unknown }>("participants", "select=id&workspace_id=eq.1");
+    return rows.length;
+  }
+  return (getDb().prepare("SELECT COUNT(*) c FROM participants WHERE workspace_id = 1").get() as { c: number }).c;
+}
+
+// ---------------------------------------------------------------------------
+// Casos clínicos
+// ---------------------------------------------------------------------------
+
+type CaseDbRow = {
+  id: unknown;
+  participant_id: unknown;
+  nome: string;
   idade: unknown;
   diagnostico_preliminar: string;
   escola_serie: string;
   responsavel_nome: string;
   responsavel_contato: string;
   queixa_principal: string;
+  objetivo: string;
+  observacoes: string;
+  status: "ativo" | "encerrado";
   criado_em: string;
 };
 
-function mapClient(r: ClientDbRow): Client {
+function mapCase(r: CaseDbRow): ClinicalCase {
   return {
     id: n(r.id),
-    userId: nOrNull(r.user_id),
+    participantId: n(r.participant_id),
     nome: r.nome,
-    email: r.email,
-    objetivo: r.objetivo,
-    observacoes: r.observacoes,
     idade: nOrNull(r.idade),
     diagnosticoPreliminar: r.diagnostico_preliminar ?? "",
     escolaSerie: r.escola_serie ?? "",
     responsavelNome: r.responsavel_nome ?? "",
     responsavelContato: r.responsavel_contato ?? "",
     queixaPrincipal: r.queixa_principal ?? "",
+    objetivo: r.objetivo ?? "",
+    observacoes: r.observacoes ?? "",
+    status: r.status ?? "ativo",
     criadoEm: r.criado_em,
   };
 }
 
-const CLIENT_COLS =
-  "id,user_id,nome,email,objetivo,observacoes,idade,diagnostico_preliminar,escola_serie,responsavel_nome,responsavel_contato,queixa_principal,criado_em";
+const CASE_COLS =
+  "id,participant_id,nome,idade,diagnostico_preliminar,escola_serie,responsavel_nome,responsavel_contato,queixa_principal,objetivo,observacoes,status,criado_em";
 
-export async function listClients(): Promise<Client[]> {
+export async function listCasesByParticipant(participantId: number): Promise<ClinicalCase[]> {
   if (postgresEnabled()) {
-    const rows = await pgSelect<ClientDbRow>("clients", `select=${CLIENT_COLS}&workspace_id=eq.1&order=nome.asc`);
-    return rows.map(mapClient);
+    const rows = await pgSelect<CaseDbRow>("clinical_cases", `select=${CASE_COLS}&participant_id=eq.${participantId}&order=criado_em.desc`);
+    return rows.map(mapCase);
   }
-  return (getDb().prepare(`SELECT ${CLIENT_COLS} FROM clients WHERE workspace_id = 1 ORDER BY nome`).all() as ClientDbRow[]).map(mapClient);
+  return (
+    getDb().prepare(`SELECT ${CASE_COLS} FROM clinical_cases WHERE participant_id = ? ORDER BY criado_em DESC`).all(participantId) as CaseDbRow[]
+  ).map(mapCase);
 }
 
-export async function listClientsWithLastEvent(): Promise<(Client & { ultimoEvento: string | null })[]> {
-  const clients = await listClients();
+export async function getCase(id: number): Promise<ClinicalCase | null> {
   if (postgresEnabled()) {
-    const events = await pgSelect<{ client_id: unknown; criado_em: string }>("events", "select=client_id,criado_em&workspace_id=eq.1");
-    const last = new Map<number, string>();
-    for (const e of events) {
-      const cid = n(e.client_id);
-      const prev = last.get(cid);
-      if (!prev || e.criado_em > prev) last.set(cid, e.criado_em);
-    }
-    return clients.map((c) => ({ ...c, ultimoEvento: last.get(c.id) ?? null }));
+    const rows = await pgSelect<CaseDbRow>("clinical_cases", `select=${CASE_COLS}&id=eq.${id}&workspace_id=eq.1&limit=1`);
+    return rows[0] ? mapCase(rows[0]) : null;
   }
-  const db = getDb();
-  return clients.map((c) => {
-    const row = db.prepare("SELECT MAX(criado_em) m FROM events WHERE client_id = ?").get(c.id) as { m: string | null };
-    return { ...c, ultimoEvento: row.m };
-  });
+  const row = getDb().prepare(`SELECT ${CASE_COLS} FROM clinical_cases WHERE id = ? AND workspace_id = 1`).get(id) as CaseDbRow | undefined;
+  return row ? mapCase(row) : null;
 }
 
-export async function getClient(id: number): Promise<Client | null> {
-  if (postgresEnabled()) {
-    const rows = await pgSelect<ClientDbRow>("clients", `select=${CLIENT_COLS}&id=eq.${id}&workspace_id=eq.1&limit=1`);
-    return rows[0] ? mapClient(rows[0]) : null;
-  }
-  const row = getDb().prepare(`SELECT ${CLIENT_COLS} FROM clients WHERE id = ? AND workspace_id = 1`).get(id) as ClientDbRow | undefined;
-  return row ? mapClient(row) : null;
-}
-
-function clientBody(input: ClientInput) {
+function caseBody(input: ClinicalCaseInput) {
   return {
     nome: input.nome.trim(),
-    email: input.email.trim().toLowerCase(),
-    objetivo: input.objetivo ?? "",
-    observacoes: input.observacoes ?? "",
     idade: input.idade,
     diagnostico_preliminar: input.diagnosticoPreliminar ?? "",
     escola_serie: input.escolaSerie ?? "",
     responsavel_nome: input.responsavelNome ?? "",
     responsavel_contato: input.responsavelContato ?? "",
     queixa_principal: input.queixaPrincipal ?? "",
+    objetivo: input.objetivo ?? "",
+    observacoes: input.observacoes ?? "",
   };
 }
 
-export async function createClient(input: ClientInput): Promise<number> {
-  const body = clientBody(input);
+export async function createCase(participantId: number, input: ClinicalCaseInput): Promise<number> {
+  const body = caseBody(input);
   if (postgresEnabled()) {
-    const row = await pgInsert<{ id: unknown }>("clients", { workspace_id: 1, ...body });
+    const row = await pgInsert<{ id: unknown }>("clinical_cases", { workspace_id: 1, participant_id: participantId, ...body });
     return n(row.id);
   }
   const info = getDb()
     .prepare(
-      `INSERT INTO clients (workspace_id, nome, email, objetivo, observacoes, idade, diagnostico_preliminar, escola_serie, responsavel_nome, responsavel_contato, queixa_principal)
+      `INSERT INTO clinical_cases (workspace_id, participant_id, nome, idade, diagnostico_preliminar, escola_serie, responsavel_nome, responsavel_contato, queixa_principal, objetivo, observacoes)
        VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     )
-    .run(body.nome, body.email, body.objetivo, body.observacoes, body.idade, body.diagnostico_preliminar, body.escola_serie, body.responsavel_nome, body.responsavel_contato, body.queixa_principal);
+    .run(
+      participantId,
+      body.nome,
+      body.idade,
+      body.diagnostico_preliminar,
+      body.escola_serie,
+      body.responsavel_nome,
+      body.responsavel_contato,
+      body.queixa_principal,
+      body.objetivo,
+      body.observacoes
+    );
   return Number(info.lastInsertRowid);
 }
 
-export async function updateClient(id: number, input: ClientInput): Promise<void> {
-  const body = clientBody(input);
-  if (postgresEnabled()) return void (await pgUpdate("clients", id, body));
+export async function updateCase(id: number, input: ClinicalCaseInput): Promise<void> {
+  const body = caseBody(input);
+  if (postgresEnabled()) return void (await pgUpdate("clinical_cases", id, body));
   getDb()
     .prepare(
-      `UPDATE clients SET nome=?, email=?, objetivo=?, observacoes=?, idade=?, diagnostico_preliminar=?, escola_serie=?, responsavel_nome=?, responsavel_contato=?, queixa_principal=? WHERE id = ?`
+      `UPDATE clinical_cases SET nome=?, idade=?, diagnostico_preliminar=?, escola_serie=?, responsavel_nome=?, responsavel_contato=?, queixa_principal=?, objetivo=?, observacoes=? WHERE id = ?`
     )
-    .run(body.nome, body.email, body.objetivo, body.observacoes, body.idade, body.diagnostico_preliminar, body.escola_serie, body.responsavel_nome, body.responsavel_contato, body.queixa_principal, id);
+    .run(
+      body.nome,
+      body.idade,
+      body.diagnostico_preliminar,
+      body.escola_serie,
+      body.responsavel_nome,
+      body.responsavel_contato,
+      body.queixa_principal,
+      body.objetivo,
+      body.observacoes,
+      id
+    );
+}
+
+export async function updateCaseStatus(id: number, status: "ativo" | "encerrado"): Promise<void> {
+  if (postgresEnabled()) return void (await pgUpdate("clinical_cases", id, { status }));
+  getDb().prepare("UPDATE clinical_cases SET status = ? WHERE id = ?").run(status, id);
+}
+
+export async function countActiveCases(): Promise<number> {
+  if (postgresEnabled()) {
+    const rows = await pgSelect<{ id: unknown }>("clinical_cases", "select=id&workspace_id=eq.1&status=eq.ativo");
+    return rows.length;
+  }
+  return (getDb().prepare("SELECT COUNT(*) c FROM clinical_cases WHERE workspace_id = 1 AND status = 'ativo'").get() as { c: number }).c;
 }
 
 // ---------------------------------------------------------------------------
@@ -467,7 +619,7 @@ export async function deleteCategory(id: number): Promise<void> {
 type DocDbRow = {
   id: unknown;
   categoria_id: unknown;
-  client_id: unknown;
+  case_id: unknown;
   nome: string;
   tipo: string;
   tamanho: unknown;
@@ -482,7 +634,7 @@ function mapDoc(r: DocDbRow): DocumentRow {
   return {
     id: n(r.id),
     categoriaId: nOrNull(r.categoria_id),
-    clientId: nOrNull(r.client_id),
+    caseId: nOrNull(r.case_id),
     nome: r.nome,
     tipo: r.tipo,
     tamanho: n(r.tamanho),
@@ -494,7 +646,7 @@ function mapDoc(r: DocDbRow): DocumentRow {
   };
 }
 
-const DOC_COLS = "id,categoria_id,client_id,nome,tipo,tamanho,storage_path,conteudo,disponivel_assistente,enviado_por,criado_em";
+const DOC_COLS = "id,categoria_id,case_id,nome,tipo,tamanho,storage_path,conteudo,disponivel_assistente,enviado_por,criado_em";
 
 export async function listLibraryDocuments(): Promise<DocumentRow[]> {
   if (postgresEnabled()) {
@@ -504,12 +656,12 @@ export async function listLibraryDocuments(): Promise<DocumentRow[]> {
   return (getDb().prepare(`SELECT ${DOC_COLS} FROM documents WHERE workspace_id = 1 AND categoria_id IS NOT NULL ORDER BY nome`).all() as DocDbRow[]).map(mapDoc);
 }
 
-export async function listClientDocuments(clientId: number): Promise<DocumentRow[]> {
+export async function listCaseDocuments(caseId: number): Promise<DocumentRow[]> {
   if (postgresEnabled()) {
-    const rows = await pgSelect<DocDbRow>("documents", `select=${DOC_COLS}&client_id=eq.${clientId}&order=criado_em.desc`);
+    const rows = await pgSelect<DocDbRow>("documents", `select=${DOC_COLS}&case_id=eq.${caseId}&order=criado_em.desc`);
     return rows.map(mapDoc);
   }
-  return (getDb().prepare(`SELECT ${DOC_COLS} FROM documents WHERE client_id = ? ORDER BY criado_em DESC`).all(clientId) as DocDbRow[]).map(mapDoc);
+  return (getDb().prepare(`SELECT ${DOC_COLS} FROM documents WHERE case_id = ? ORDER BY criado_em DESC`).all(caseId) as DocDbRow[]).map(mapDoc);
 }
 
 export async function getDocument(id: number): Promise<DocumentRow | null> {
@@ -523,7 +675,7 @@ export async function getDocument(id: number): Promise<DocumentRow | null> {
 
 export async function createDocument(input: {
   categoriaId: number | null;
-  clientId: number | null;
+  caseId: number | null;
   nome: string;
   tipo: string;
   tamanho: number;
@@ -535,7 +687,7 @@ export async function createDocument(input: {
     const row = await pgInsert<{ id: unknown }>("documents", {
       workspace_id: 1,
       categoria_id: input.categoriaId,
-      client_id: input.clientId,
+      case_id: input.caseId,
       nome: input.nome,
       tipo: input.tipo,
       tamanho: input.tamanho,
@@ -547,9 +699,9 @@ export async function createDocument(input: {
   }
   const info = getDb()
     .prepare(
-      "INSERT INTO documents (workspace_id, categoria_id, client_id, nome, tipo, tamanho, storage_path, conteudo, enviado_por) VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?)"
+      "INSERT INTO documents (workspace_id, categoria_id, case_id, nome, tipo, tamanho, storage_path, conteudo, enviado_por) VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?)"
     )
-    .run(input.categoriaId, input.clientId, input.nome, input.tipo, input.tamanho, input.storagePath, input.conteudo, input.enviadoPor);
+    .run(input.categoriaId, input.caseId, input.nome, input.tipo, input.tamanho, input.storagePath, input.conteudo, input.enviadoPor);
   return Number(info.lastInsertRowid);
 }
 
@@ -576,14 +728,6 @@ export async function countLibraryDocuments(): Promise<number> {
     return rows.length;
   }
   return (getDb().prepare("SELECT COUNT(*) c FROM documents WHERE workspace_id = 1 AND categoria_id IS NOT NULL").get() as { c: number }).c;
-}
-
-export async function countClients(): Promise<number> {
-  if (postgresEnabled()) {
-    const rows = await pgSelect<{ id: unknown }>("clients", "select=id&workspace_id=eq.1");
-    return rows.length;
-  }
-  return (getDb().prepare("SELECT COUNT(*) c FROM clients WHERE workspace_id = 1").get() as { c: number }).c;
 }
 
 export async function countConversations(): Promise<number> {
@@ -632,54 +776,69 @@ export async function deleteKnowledge(id: number): Promise<void> {
 // Linha do tempo (events)
 // ---------------------------------------------------------------------------
 
-export async function listClientEvents(clientId: number, limit: number): Promise<EventRow[]> {
+export async function listParticipantEvents(participantId: number, limit: number): Promise<EventRow[]> {
   if (postgresEnabled()) {
     const rows = await pgSelect<{ tipo: string; descricao: string; criado_em: string }>(
       "events",
-      `select=tipo,descricao,criado_em&client_id=eq.${clientId}&order=criado_em.desc&limit=${limit}`
+      `select=tipo,descricao,criado_em&participant_id=eq.${participantId}&order=criado_em.desc&limit=${limit}`
     );
     return rows.map((r) => ({ tipo: r.tipo, descricao: r.descricao, criadoEm: r.criado_em }));
   }
   return getDb()
-    .prepare("SELECT tipo, descricao, criado_em AS criadoEm FROM events WHERE client_id = ? ORDER BY criado_em DESC LIMIT ?")
-    .all(clientId, limit) as EventRow[];
+    .prepare("SELECT tipo, descricao, criado_em AS criadoEm FROM events WHERE participant_id = ? ORDER BY criado_em DESC LIMIT ?")
+    .all(participantId, limit) as EventRow[];
 }
 
-export async function logEvent(clientId: number, tipo: "conversa" | "material" | "observacao" | "resumo" | "sessao" | "protocolo", descricao: string): Promise<void> {
+export async function listCaseEvents(caseId: number, limit: number): Promise<EventRow[]> {
   if (postgresEnabled()) {
-    await pgInsert("events", { workspace_id: 1, client_id: clientId, tipo, descricao });
-    return;
-  }
-  getDb().prepare("INSERT INTO events (workspace_id, client_id, tipo, descricao) VALUES (1, ?, ?, ?)").run(clientId, tipo, descricao);
-}
-
-// ---------------------------------------------------------------------------
-// Prontuário (session_notes)
-// ---------------------------------------------------------------------------
-
-export async function listSessionNotes(clientId: number): Promise<SessionNote[]> {
-  if (postgresEnabled()) {
-    const rows = await pgSelect<{ id: unknown; client_id: unknown; data_sessao: string; conteudo: string; criado_por: string; criado_em: string }>(
-      "session_notes",
-      `select=id,client_id,data_sessao,conteudo,criado_por,criado_em&client_id=eq.${clientId}&order=data_sessao.desc`
+    const rows = await pgSelect<{ tipo: string; descricao: string; criado_em: string }>(
+      "events",
+      `select=tipo,descricao,criado_em&case_id=eq.${caseId}&order=criado_em.desc&limit=${limit}`
     );
-    return rows.map((r) => ({ id: n(r.id), clientId: n(r.client_id), dataSessao: r.data_sessao, conteudo: r.conteudo, criadoPor: r.criado_por, criadoEm: r.criado_em }));
+    return rows.map((r) => ({ tipo: r.tipo, descricao: r.descricao, criadoEm: r.criado_em }));
   }
   return getDb()
-    .prepare("SELECT id, client_id AS clientId, data_sessao AS dataSessao, conteudo, criado_por AS criadoPor, criado_em AS criadoEm FROM session_notes WHERE client_id = ? ORDER BY data_sessao DESC")
-    .all(clientId) as SessionNote[];
+    .prepare("SELECT tipo, descricao, criado_em AS criadoEm FROM events WHERE case_id = ? ORDER BY criado_em DESC LIMIT ?")
+    .all(caseId, limit) as EventRow[];
 }
 
-export async function listRecentSessionNotes(clientId: number, limit: number): Promise<{ dataSessao: string; conteudo: string }[]> {
-  const notas = await listSessionNotes(clientId);
+export type EventTipo = "conversa" | "material" | "observacao" | "resumo" | "sessao" | "protocolo" | "hipotese";
+
+export async function logEvent(participantId: number, caseId: number | null, tipo: EventTipo, descricao: string): Promise<void> {
+  if (postgresEnabled()) {
+    await pgInsert("events", { workspace_id: 1, participant_id: participantId, case_id: caseId, tipo, descricao });
+    return;
+  }
+  getDb().prepare("INSERT INTO events (workspace_id, participant_id, case_id, tipo, descricao) VALUES (1, ?, ?, ?, ?)").run(participantId, caseId, tipo, descricao);
+}
+
+// ---------------------------------------------------------------------------
+// Registros de raciocínio clínico por caso (case_notes)
+// ---------------------------------------------------------------------------
+
+export async function listCaseNotes(caseId: number): Promise<CaseNote[]> {
+  if (postgresEnabled()) {
+    const rows = await pgSelect<{ id: unknown; case_id: unknown; data_sessao: string; conteudo: string; criado_por: string; criado_em: string }>(
+      "case_notes",
+      `select=id,case_id,data_sessao,conteudo,criado_por,criado_em&case_id=eq.${caseId}&order=data_sessao.desc`
+    );
+    return rows.map((r) => ({ id: n(r.id), caseId: n(r.case_id), dataSessao: r.data_sessao, conteudo: r.conteudo, criadoPor: r.criado_por, criadoEm: r.criado_em }));
+  }
+  return getDb()
+    .prepare("SELECT id, case_id AS caseId, data_sessao AS dataSessao, conteudo, criado_por AS criadoPor, criado_em AS criadoEm FROM case_notes WHERE case_id = ? ORDER BY data_sessao DESC")
+    .all(caseId) as CaseNote[];
+}
+
+export async function listRecentCaseNotes(caseId: number, limit: number): Promise<{ dataSessao: string; conteudo: string }[]> {
+  const notas = await listCaseNotes(caseId);
   return notas.slice(0, limit).map((n2) => ({ dataSessao: n2.dataSessao, conteudo: n2.conteudo }));
 }
 
-export async function createSessionNote(input: { clientId: number; dataSessao: string; conteudo: string; criadoPor: string }): Promise<number> {
+export async function createCaseNote(input: { caseId: number; dataSessao: string; conteudo: string; criadoPor: string }): Promise<number> {
   if (postgresEnabled()) {
-    const row = await pgInsert<{ id: unknown }>("session_notes", {
+    const row = await pgInsert<{ id: unknown }>("case_notes", {
       workspace_id: 1,
-      client_id: input.clientId,
+      case_id: input.caseId,
       data_sessao: input.dataSessao,
       conteudo: input.conteudo,
       criado_por: input.criadoPor,
@@ -687,36 +846,128 @@ export async function createSessionNote(input: { clientId: number; dataSessao: s
     return n(row.id);
   }
   const info = getDb()
-    .prepare("INSERT INTO session_notes (workspace_id, client_id, data_sessao, conteudo, criado_por) VALUES (1, ?, ?, ?, ?)")
-    .run(input.clientId, input.dataSessao, input.conteudo, input.criadoPor);
+    .prepare("INSERT INTO case_notes (workspace_id, case_id, data_sessao, conteudo, criado_por) VALUES (1, ?, ?, ?, ?)")
+    .run(input.caseId, input.dataSessao, input.conteudo, input.criadoPor);
   return Number(info.lastInsertRowid);
 }
 
-export async function deleteSessionNote(id: number): Promise<void> {
-  if (postgresEnabled()) return void (await pgDelete("session_notes", id));
-  getDb().prepare("DELETE FROM session_notes WHERE id = ?").run(id);
+export async function deleteCaseNote(id: number): Promise<void> {
+  if (postgresEnabled()) return void (await pgDelete("case_notes", id));
+  getDb().prepare("DELETE FROM case_notes WHERE id = ?").run(id);
+}
+
+// ---------------------------------------------------------------------------
+// Hipóteses clínicas por caso
+// ---------------------------------------------------------------------------
+
+function mapHypothesis(r: {
+  id: unknown;
+  case_id: unknown;
+  texto: string;
+  status: "ativa" | "confirmada" | "descartada";
+  evidencias_favor: string;
+  evidencias_contra: string;
+  criado_em: string;
+  atualizado_em: string;
+}): Hypothesis {
+  return {
+    id: n(r.id),
+    caseId: n(r.case_id),
+    texto: r.texto,
+    status: r.status,
+    evidenciasFavor: r.evidencias_favor ?? "",
+    evidenciasContra: r.evidencias_contra ?? "",
+    criadoEm: r.criado_em,
+    atualizadoEm: r.atualizado_em,
+  };
+}
+
+const HYPOTHESIS_COLS = "id,case_id,texto,status,evidencias_favor,evidencias_contra,criado_em,atualizado_em";
+
+export async function listHypotheses(caseId: number): Promise<Hypothesis[]> {
+  if (postgresEnabled()) {
+    const rows = await pgSelect<Parameters<typeof mapHypothesis>[0]>(
+      "hypotheses",
+      `select=${HYPOTHESIS_COLS}&case_id=eq.${caseId}&order=criado_em.desc`
+    );
+    return rows.map(mapHypothesis);
+  }
+  return (
+    getDb().prepare(`SELECT ${HYPOTHESIS_COLS} FROM hypotheses WHERE case_id = ? ORDER BY criado_em DESC`).all(caseId) as Parameters<
+      typeof mapHypothesis
+    >[0][]
+  ).map(mapHypothesis);
+}
+
+export async function createHypothesis(input: { caseId: number; texto: string; evidenciasFavor: string; evidenciasContra: string }): Promise<number> {
+  if (postgresEnabled()) {
+    const row = await pgInsert<{ id: unknown }>("hypotheses", {
+      workspace_id: 1,
+      case_id: input.caseId,
+      texto: input.texto,
+      evidencias_favor: input.evidenciasFavor,
+      evidencias_contra: input.evidenciasContra,
+    });
+    return n(row.id);
+  }
+  const info = getDb()
+    .prepare("INSERT INTO hypotheses (workspace_id, case_id, texto, evidencias_favor, evidencias_contra) VALUES (1, ?, ?, ?, ?)")
+    .run(input.caseId, input.texto, input.evidenciasFavor, input.evidenciasContra);
+  return Number(info.lastInsertRowid);
+}
+
+export async function updateHypothesis(
+  id: number,
+  input: { status?: "ativa" | "confirmada" | "descartada"; evidenciasFavor?: string; evidenciasContra?: string }
+): Promise<void> {
+  const body: Record<string, unknown> = { atualizado_em: new Date().toISOString() };
+  if (input.status !== undefined) body.status = input.status;
+  if (input.evidenciasFavor !== undefined) body.evidencias_favor = input.evidenciasFavor;
+  if (input.evidenciasContra !== undefined) body.evidencias_contra = input.evidenciasContra;
+  if (postgresEnabled()) {
+    await pgRequest(`/hypotheses?id=eq.${id}`, { method: "PATCH", body: JSON.stringify(body) });
+    return;
+  }
+  const db = getDb();
+  if (input.status !== undefined) db.prepare("UPDATE hypotheses SET status = ?, atualizado_em = datetime('now') WHERE id = ?").run(input.status, id);
+  if (input.evidenciasFavor !== undefined)
+    db.prepare("UPDATE hypotheses SET evidencias_favor = ?, atualizado_em = datetime('now') WHERE id = ?").run(input.evidenciasFavor, id);
+  if (input.evidenciasContra !== undefined)
+    db.prepare("UPDATE hypotheses SET evidencias_contra = ?, atualizado_em = datetime('now') WHERE id = ?").run(input.evidenciasContra, id);
+}
+
+export async function deleteHypothesis(id: number): Promise<void> {
+  if (postgresEnabled()) return void (await pgDelete("hypotheses", id));
+  getDb().prepare("DELETE FROM hypotheses WHERE id = ?").run(id);
 }
 
 // ---------------------------------------------------------------------------
 // Conversas / mensagens (assistente)
 // ---------------------------------------------------------------------------
 
-export async function createConversation(clientId: number, titulo: string): Promise<number> {
+export async function createConversation(participantId: number, caseId: number | null, titulo: string): Promise<number> {
   if (postgresEnabled()) {
-    const row = await pgInsert<{ id: unknown }>("conversations", { workspace_id: 1, client_id: clientId, titulo });
+    const row = await pgInsert<{ id: unknown }>("conversations", { workspace_id: 1, participant_id: participantId, case_id: caseId, titulo });
     return n(row.id);
   }
-  const info = getDb().prepare("INSERT INTO conversations (workspace_id, client_id, titulo) VALUES (1, ?, ?)").run(clientId, titulo);
+  const info = getDb()
+    .prepare("INSERT INTO conversations (workspace_id, participant_id, case_id, titulo) VALUES (1, ?, ?, ?)")
+    .run(participantId, caseId, titulo);
   return Number(info.lastInsertRowid);
 }
 
-export async function getConversationClientId(conversationId: number): Promise<number | null> {
+export async function getConversationContext(conversationId: number): Promise<{ participantId: number; caseId: number | null } | null> {
   if (postgresEnabled()) {
-    const rows = await pgSelect<{ client_id: unknown }>("conversations", `select=client_id&id=eq.${conversationId}&workspace_id=eq.1&limit=1`);
-    return rows[0] ? n(rows[0].client_id) : null;
+    const rows = await pgSelect<{ participant_id: unknown; case_id: unknown }>(
+      "conversations",
+      `select=participant_id,case_id&id=eq.${conversationId}&workspace_id=eq.1&limit=1`
+    );
+    return rows[0] ? { participantId: n(rows[0].participant_id), caseId: nOrNull(rows[0].case_id) } : null;
   }
-  const row = getDb().prepare("SELECT client_id FROM conversations WHERE id = ? AND workspace_id = 1").get(conversationId) as { client_id: number } | undefined;
-  return row?.client_id ?? null;
+  const row = getDb().prepare("SELECT participant_id, case_id FROM conversations WHERE id = ? AND workspace_id = 1").get(conversationId) as
+    | { participant_id: number; case_id: number | null }
+    | undefined;
+  return row ? { participantId: row.participant_id, caseId: row.case_id ?? null } : null;
 }
 
 export async function createMessage(input: { conversationId: number; papel: "usuario" | "assistente"; autor: string; conteudo: string; fontes: unknown[] }): Promise<void> {
@@ -731,9 +982,11 @@ export async function createMessage(input: { conversationId: number; papel: "usu
     .run(input.conversationId, input.papel, input.autor, input.conteudo, JSON.stringify(input.fontes));
 }
 
-export async function listRecentMessages(clientId: number, limit: number): Promise<MessageRow[]> {
+/** Mensagens recentes da conversa no mesmo escopo (geral da participante quando caseId=null, ou de um caso específico). */
+export async function listRecentMessages(participantId: number, caseId: number | null, limit: number): Promise<MessageRow[]> {
   if (postgresEnabled()) {
-    const convs = await pgSelect<{ id: unknown }>("conversations", `select=id&client_id=eq.${clientId}`);
+    const filtroCaso = caseId === null ? "case_id=is.null" : `case_id=eq.${caseId}`;
+    const convs = await pgSelect<{ id: unknown }>("conversations", `select=id&participant_id=eq.${participantId}&${filtroCaso}`);
     if (convs.length === 0) return [];
     const ids = convs.map((c) => n(c.id)).join(",");
     const rows = await pgSelect<{ papel: "usuario" | "assistente"; autor: string; conteudo: string; criado_em: string; id: unknown }>(
@@ -742,25 +995,28 @@ export async function listRecentMessages(clientId: number, limit: number): Promi
     );
     return rows.reverse().map((r) => ({ papel: r.papel, autor: r.autor, conteudo: r.conteudo, criadoEm: r.criado_em }));
   }
+  const filtroCaso = caseId === null ? "c.case_id IS NULL" : "c.case_id = ?";
+  const params = caseId === null ? [participantId, limit] : [participantId, caseId, limit];
   return (
     getDb()
       .prepare(
         `SELECT m.papel, m.autor, m.conteudo, m.criado_em AS criadoEm FROM messages m
          JOIN conversations c ON c.id = m.conversation_id
-         WHERE c.client_id = ? ORDER BY m.id DESC LIMIT ?`
+         WHERE c.participant_id = ? AND ${filtroCaso} ORDER BY m.id DESC LIMIT ?`
       )
-      .all(clientId, limit) as MessageRow[]
+      .all(...params) as MessageRow[]
   ).reverse();
 }
 
-export async function listAllMessages(clientId: number): Promise<MessageRow[]> {
+/** Todas as mensagens da participante (qualquer caso), usadas para montar o resumo pré-encontro. */
+export async function listAllMessagesForParticipant(participantId: number): Promise<MessageRow[]> {
   if (postgresEnabled()) {
-    const convs = await pgSelect<{ id: unknown }>("conversations", `select=id&client_id=eq.${clientId}`);
+    const convs = await pgSelect<{ id: unknown }>("conversations", `select=id&participant_id=eq.${participantId}`);
     if (convs.length === 0) return [];
     const ids = convs.map((c) => n(c.id)).join(",");
     const rows = await pgSelect<{ papel: "usuario" | "assistente"; autor: string; conteudo: string; criado_em: string; id: unknown }>(
       "messages",
-      `select=id,papel,autor,conteudo,criado_em&conversation_id=in.(${ids})&order=id.asc&limit=200`
+      `select=id,papel,autor,conteudo,criado_em&conversation_id=in.(${ids})&order=id.asc&limit=400`
     );
     return rows.map((r) => ({ papel: r.papel, autor: r.autor, conteudo: r.conteudo, criadoEm: r.criado_em }));
   }
@@ -768,9 +1024,9 @@ export async function listAllMessages(clientId: number): Promise<MessageRow[]> {
     .prepare(
       `SELECT m.papel, m.autor, m.conteudo, m.criado_em AS criadoEm FROM messages m
        JOIN conversations c ON c.id = m.conversation_id
-       WHERE c.client_id = ? ORDER BY m.id ASC LIMIT 200`
+       WHERE c.participant_id = ? ORDER BY m.id ASC LIMIT 400`
     )
-    .all(clientId) as MessageRow[];
+    .all(participantId) as MessageRow[];
 }
 
 // ---------------------------------------------------------------------------
@@ -997,12 +1253,12 @@ export async function syncBuiltinProtocols(): Promise<void> {
 }
 
 // ---------------------------------------------------------------------------
-// Protocolos: aplicações (assignments) e respostas por cliente
+// Protocolos: aplicações (assignments) e respostas por caso clínico
 // ---------------------------------------------------------------------------
 
 function mapAssignment(r: {
   id: unknown;
-  client_id: unknown;
+  case_id: unknown;
   protocol_id: unknown;
   protocol_nome?: string;
   data_aplicacao: string;
@@ -1013,7 +1269,7 @@ function mapAssignment(r: {
 }): ProtocolAssignment {
   return {
     id: n(r.id),
-    clientId: n(r.client_id),
+    caseId: n(r.case_id),
     protocolId: n(r.protocol_id),
     protocolNome: r.protocol_nome ?? "",
     dataAplicacao: r.data_aplicacao,
@@ -1024,13 +1280,13 @@ function mapAssignment(r: {
   };
 }
 
-export async function listClientAssignments(clientId: number): Promise<ProtocolAssignment[]> {
+export async function listCaseAssignments(caseId: number): Promise<ProtocolAssignment[]> {
   const protocolos = await listProtocolSummaries();
   const nomeById = new Map(protocolos.map((p) => [p.id, p.nome]));
   if (postgresEnabled()) {
     const rows = await pgSelect<{
       id: unknown;
-      client_id: unknown;
+      case_id: unknown;
       protocol_id: unknown;
       data_aplicacao: string;
       status: "em_andamento" | "concluido";
@@ -1039,17 +1295,17 @@ export async function listClientAssignments(clientId: number): Promise<ProtocolA
       atualizado_em: string;
     }>(
       "protocol_assignments",
-      `select=id,client_id,protocol_id,data_aplicacao,status,criado_por,criado_em,atualizado_em&client_id=eq.${clientId}&order=data_aplicacao.desc`
+      `select=id,case_id,protocol_id,data_aplicacao,status,criado_por,criado_em,atualizado_em&case_id=eq.${caseId}&order=data_aplicacao.desc`
     );
     return rows.map((r) => mapAssignment({ ...r, protocol_nome: nomeById.get(n(r.protocol_id)) }));
   }
   const rows = getDb()
     .prepare(
-      "SELECT id, client_id, protocol_id, data_aplicacao, status, criado_por, criado_em, atualizado_em FROM protocol_assignments WHERE client_id = ? ORDER BY data_aplicacao DESC"
+      "SELECT id, case_id, protocol_id, data_aplicacao, status, criado_por, criado_em, atualizado_em FROM protocol_assignments WHERE case_id = ? ORDER BY data_aplicacao DESC"
     )
-    .all(clientId) as {
+    .all(caseId) as {
     id: number;
-    client_id: number;
+    case_id: number;
     protocol_id: number;
     data_aplicacao: string;
     status: "em_andamento" | "concluido";
@@ -1072,7 +1328,7 @@ async function pgOrDbSelectAssignment(id: number): Promise<ProtocolAssignment | 
   if (postgresEnabled()) {
     const rows = await pgSelect<{
       id: unknown;
-      client_id: unknown;
+      case_id: unknown;
       protocol_id: unknown;
       data_aplicacao: string;
       status: "em_andamento" | "concluido";
@@ -1081,16 +1337,16 @@ async function pgOrDbSelectAssignment(id: number): Promise<ProtocolAssignment | 
       atualizado_em: string;
     }>(
       "protocol_assignments",
-      `select=id,client_id,protocol_id,data_aplicacao,status,criado_por,criado_em,atualizado_em&id=eq.${id}&limit=1`
+      `select=id,case_id,protocol_id,data_aplicacao,status,criado_por,criado_em,atualizado_em&id=eq.${id}&limit=1`
     );
     return rows[0] ? mapAssignment(rows[0]) : null;
   }
   const row = getDb()
-    .prepare("SELECT id, client_id, protocol_id, data_aplicacao, status, criado_por, criado_em, atualizado_em FROM protocol_assignments WHERE id = ?")
+    .prepare("SELECT id, case_id, protocol_id, data_aplicacao, status, criado_por, criado_em, atualizado_em FROM protocol_assignments WHERE id = ?")
     .get(id) as
     | {
         id: number;
-        client_id: number;
+        case_id: number;
         protocol_id: number;
         data_aplicacao: string;
         status: "em_andamento" | "concluido";
@@ -1102,11 +1358,11 @@ async function pgOrDbSelectAssignment(id: number): Promise<ProtocolAssignment | 
   return row ? mapAssignment(row) : null;
 }
 
-export async function createAssignment(input: { clientId: number; protocolId: number; dataAplicacao: string; criadoPor: string }): Promise<number> {
+export async function createAssignment(input: { caseId: number; protocolId: number; dataAplicacao: string; criadoPor: string }): Promise<number> {
   if (postgresEnabled()) {
     const row = await pgInsert<{ id: unknown }>("protocol_assignments", {
       workspace_id: 1,
-      client_id: input.clientId,
+      case_id: input.caseId,
       protocol_id: input.protocolId,
       data_aplicacao: input.dataAplicacao,
       criado_por: input.criadoPor,
@@ -1114,8 +1370,8 @@ export async function createAssignment(input: { clientId: number; protocolId: nu
     return n(row.id);
   }
   const info = getDb()
-    .prepare("INSERT INTO protocol_assignments (workspace_id, client_id, protocol_id, data_aplicacao, criado_por) VALUES (1, ?, ?, ?, ?)")
-    .run(input.clientId, input.protocolId, input.dataAplicacao, input.criadoPor);
+    .prepare("INSERT INTO protocol_assignments (workspace_id, case_id, protocol_id, data_aplicacao, criado_por) VALUES (1, ?, ?, ?, ?)")
+    .run(input.caseId, input.protocolId, input.dataAplicacao, input.criadoPor);
   return Number(info.lastInsertRowid);
 }
 
