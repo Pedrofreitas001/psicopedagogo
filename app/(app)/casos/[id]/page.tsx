@@ -10,6 +10,7 @@ import {
   listHypotheses,
 } from "@/lib/data";
 import { getCurrentUser } from "@/lib/auth";
+import { calcularEtapaCaso } from "@/lib/metodologia";
 import CaseForm from "@/components/CaseForm";
 import CaseNotes from "@/components/CaseNotes";
 import ProtocolosCaso from "@/components/ProtocolosCaso";
@@ -17,6 +18,7 @@ import HipotesesCaso from "@/components/HipotesesCaso";
 import Historico from "@/components/Historico";
 import UploadForm from "@/components/UploadForm";
 import ChatAssistente from "@/components/ChatAssistente";
+import ProximoPassoCaso from "@/components/ProximoPassoCaso";
 
 const ICONE: Record<string, string> = { pdf: "📕", docx: "📘", doc: "📘", pptx: "📙", ppt: "📙", xlsx: "📗", xls: "📗" };
 
@@ -45,6 +47,8 @@ export default async function CasoPage({ params }: { params: Promise<{ id: strin
     listCaseAssignments(caso.id),
     listHypotheses(caso.id),
   ]);
+
+  const etapa = calcularEtapaCaso(assignments, hipoteses, notas);
 
   const secao = "card rounded-2xl p-6";
   const tituloSecao = "flex items-center gap-2 text-[15px] font-semibold";
@@ -96,6 +100,8 @@ export default async function CasoPage({ params }: { params: Promise<{ id: strin
           </div>
         </div>
       </div>
+
+      <ProximoPassoCaso etapa={etapa} />
 
       <div className={secao}>
         <h2 className={`${tituloSecao} mb-4`}>
@@ -156,7 +162,7 @@ export default async function CasoPage({ params }: { params: Promise<{ id: strin
         <Historico eventos={eventos} />
       </div>
 
-      <div className={secao}>
+      <div id="mentor-caso" className={`${secao} scroll-mt-24`}>
         <h2 className={tituloSecao}>
           <span className={iconeSecao}>forum</span> Raciocinar sobre {caso.nome}
         </h2>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Markdown from "./Markdown";
 
 type Fonte = { tipo: string; titulo: string };
@@ -70,6 +70,19 @@ export default function ChatAssistente({
     setConversationId(undefined);
     setMessages([]);
   }
+
+  // O agente pode "falar primeiro": o card de próximo passo (ProximoPassoCaso)
+  // dispara este evento com a pergunta certa para a etapa atual do caso.
+  const perguntarRef = useRef(perguntar);
+  perguntarRef.current = perguntar;
+  useEffect(() => {
+    function aoIniciar(e: Event) {
+      const pergunta = (e as CustomEvent<{ pergunta: string }>).detail?.pergunta;
+      if (pergunta) perguntarRef.current(pergunta);
+    }
+    window.addEventListener("iniciar-mentor", aoIniciar);
+    return () => window.removeEventListener("iniciar-mentor", aoIniciar);
+  }, []);
 
   return (
     <div className="flex flex-col gap-4 max-w-2xl">
