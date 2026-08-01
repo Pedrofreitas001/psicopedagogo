@@ -153,9 +153,6 @@ create or replace function current_participant_case_ids() returns setof bigint
 language sql stable security definer as
 $$ select id from clinical_cases where participant_id = current_participant_id() $$;
 
--- current_client_id() fica obsoleta — dropar depois que confirmar que nada mais a usa.
-drop function if exists current_client_id();
-
 create policy mentora_all_clinical_cases on clinical_cases for all using (is_mentora());
 create policy participante_own_cases on clinical_cases for select using (participant_id = current_participant_id());
 create policy participante_new_case on clinical_cases for insert with check (participant_id = current_participant_id());
@@ -218,3 +215,8 @@ create policy participante_new_protocol_responses on protocol_responses for inse
 
 drop policy if exists participante_knowledge on knowledge;
 create policy participante_knowledge on knowledge for select using (true);
+
+-- current_client_id() só pode cair depois que TODAS as policies antigas que
+-- dependiam dela já foram derrubadas acima — senão o Postgres recusa o drop
+-- (ERROR 2BP01: cannot drop function ... because other objects depend on it).
+drop function if exists current_client_id();

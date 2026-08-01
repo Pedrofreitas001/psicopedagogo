@@ -16,27 +16,27 @@
 }
 
 /*
- * Design system "Professional Care" (Google Stitch) — Material 3 teal.
+ * Design system "Professional Care" (Google Stitch) — Material 3, tom âmbar/dourado.
  * Os nomes antigos (--brand, --leaf, --ink-*, --surface-1, --grid) são mantidos
  * para que todos os componentes existentes ganhem o novo visual sem reescrita.
  */
 :root {
-  --page: #f9f9ff;               /* surface */
+  --page: #fbf7ee;               /* surface — creme quente */
   --surface-1: #ffffff;          /* cards (surface-container-lowest) */
-  --surface-low: #f0f3ff;        /* surface-container-low */
-  --surface-container: #e7eeff;  /* surface-container (sidebar) */
-  --surface-high: #dee8ff;       /* surface-container-high */
-  --ink-1: #111c2c;              /* on-surface */
-  --ink-2: #3f484c;              /* on-surface-variant */
-  --ink-muted: #6f787c;          /* outline */
-  --grid: #dbe3e7;               /* outline-variant suavizado */
-  --brand: #005264;              /* primary */
-  --brand-deep: #17677b;         /* surface-tint (hover do primary) */
-  --brand-container: #1e6b7f;    /* primary-container */
-  --leaf: #2c685f;               /* secondary */
-  --leaf-container: #afecdf;     /* secondary-container */
-  --card-shadow: 0px 4px 20px rgba(30, 107, 127, 0.04);
-  --card-shadow-hover: 0px 10px 32px rgba(30, 107, 127, 0.08);
+  --surface-low: #fcf4e2;        /* surface-container-low */
+  --surface-container: #f3e6c4;  /* surface-container (sidebar) */
+  --surface-high: #eeddab;       /* surface-container-high */
+  --ink-1: #241c10;              /* on-surface */
+  --ink-2: #4a3d26;              /* on-surface-variant */
+  --ink-muted: #8a7a56;          /* outline */
+  --grid: #e6d9af;               /* outline-variant suavizado */
+  --brand: #a9720e;              /* primary — âmbar/dourado */
+  --brand-deep: #8a5b0b;         /* surface-tint (hover do primary) */
+  --brand-container: #c98b1d;    /* primary-container */
+  --leaf: #6b5b2e;               /* secondary — bronze/oliva */
+  --leaf-container: #f1e3b8;     /* secondary-container */
+  --card-shadow: 0px 4px 20px rgba(154, 101, 10, 0.06);
+  --card-shadow-hover: 0px 10px 32px rgba(154, 101, 10, 0.12);
 }
 
 body {
@@ -83,4 +83,4 @@ h1, h2, h3, h4 {
 
 .custom-scrollbar::-webkit-scrollbar { width: 4px; }
 .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
-.custom-scrollbar::-webkit-scrollbar-thumb { background: #bfc8cc; border-radius: 10px; }
+.custom-scrollbar::-webkit-scrollbar-thumb { background: #d6c495; border-radius: 10px; }
