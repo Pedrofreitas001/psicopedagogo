@@ -1,11 +1,19 @@
+"use client";
+
+import { useState } from "react";
+
 const ICONE: Record<string, string> = { conversa: "💬", material: "📚", observacao: "📝", resumo: "✨", sessao: "🗒️", protocolo: "🧩", hipotese: "💡" };
+const PAGINA = 8;
 
 function dataBr(iso: string): string {
   const [y, m, d] = iso.slice(0, 10).split("-");
   return `${d}/${m}/${y}`;
 }
 
+/** Linha do tempo do caso — paginada para não deixar a seção infinita quando o caso acumula muitos registros. */
 export default function Historico({ eventos }: { eventos: { tipo: string; descricao: string; criadoEm: string }[] }) {
+  const [visiveis, setVisiveis] = useState(PAGINA);
+
   if (eventos.length === 0) {
     return (
       <div className="card rounded-2xl p-6 text-sm text-[var(--ink-muted)]">
@@ -13,17 +21,30 @@ export default function Historico({ eventos }: { eventos: { tipo: string; descri
       </div>
     );
   }
+
+  const pagina = eventos.slice(0, visiveis);
+
   return (
-    <ol className="relative border-l-2 border-[var(--grid)] pl-6 space-y-5">
-      {eventos.map((e, i) => (
-        <li key={i} className="relative">
-          <span className="absolute -left-[31px] top-0.5 grid h-5 w-5 place-items-center rounded-full bg-[var(--surface-1)] border border-black/10 text-[10px]">
-            {ICONE[e.tipo] ?? "•"}
-          </span>
-          <div className="text-[11.5px] text-[var(--ink-muted)]">{dataBr(e.criadoEm)}</div>
-          <div className="text-[13.5px] text-[var(--ink-1)] leading-relaxed">{e.descricao}</div>
-        </li>
-      ))}
-    </ol>
+    <div>
+      <ol className="relative border-l-2 border-[var(--grid)] pl-6 space-y-5">
+        {pagina.map((e, i) => (
+          <li key={i} className="relative">
+            <span className="absolute -left-[31px] top-0.5 grid h-5 w-5 place-items-center rounded-full bg-[var(--surface-1)] border border-black/10 text-[10px]">
+              {ICONE[e.tipo] ?? "•"}
+            </span>
+            <div className="text-[11.5px] text-[var(--ink-muted)]">{dataBr(e.criadoEm)}</div>
+            <div className="text-[13.5px] text-[var(--ink-1)] leading-relaxed">{e.descricao}</div>
+          </li>
+        ))}
+      </ol>
+      {visiveis < eventos.length && (
+        <button
+          onClick={() => setVisiveis((v) => v + PAGINA)}
+          className="mt-4 text-[12.5px] text-[var(--brand-deep)] hover:underline"
+        >
+          Mostrar mais ({eventos.length - visiveis} restantes)
+        </button>
+      )}
+    </div>
   );
 }

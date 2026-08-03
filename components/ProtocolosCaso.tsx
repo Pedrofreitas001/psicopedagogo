@@ -97,7 +97,7 @@ export default function ProtocolosCaso({ caseId, assignments }: { caseId: number
           </label>
           <label className="text-sm block">
             <span className="text-[var(--ink-2)]">Data de aplicação</span>
-            <input type="date" value={data} onChange={(e) => setData(e.target.value)} required className="mt-1 rounded-lg border border-black/10 bg-white px-2.5 py-2 text-sm" />
+            <input type="date" value={data} onChange={(e) => setData(e.target.value)} required className="mt-1 w-full rounded-lg border border-black/10 bg-white px-2.5 py-2 text-sm" />
           </label>
           {erro && <p className="text-[13px] text-red-600">{erro}</p>}
           <div className="flex gap-2">

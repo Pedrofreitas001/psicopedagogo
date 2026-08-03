@@ -419,8 +419,10 @@ export async function salvarConversa(
 ): Promise<number> {
   let convId = conversationId;
   if (!convId) {
+    // A conversa é sempre gravada (mensagens completas, para o histórico e o
+    // contexto do agente) — mas só aparece na linha do tempo do caso se a
+    // participante adicionar explicitamente (ver registrarConversaNaLinhaDoTempo).
     convId = await createConversation(participantId, caseId, pergunta.slice(0, 80));
-    await logEvent(participantId, caseId, "conversa", `${autor} iniciou uma conversa: “${pergunta.slice(0, 80)}”.`);
   }
   await createMessage({ conversationId: convId, papel: "usuario", autor, conteudo: pergunta, fontes: [] });
   await createMessage({ conversationId: convId, papel: "assistente", autor: "Mentor Clínico", conteudo: resposta.resposta, fontes: resposta.fontes });

@@ -45,7 +45,7 @@ export function uploadsDir(): string {
 }
 
 /** Versão do schema. DBs demo de versão antiga são recriados (só afeta o modo local/demo). */
-const SCHEMA_VERSION = 6;
+const SCHEMA_VERSION = 7;
 
 export function getDb(): Database.Database {
   if (_db) return _db;
@@ -425,4 +425,100 @@ function seed(db: Database.Database) {
     "Fluência e acurácia de leitura adequadas para a idade; acertos consistentes em questões de informação explícita.",
     "Ainda não há dado sobre vocabulário nem sobre conhecimento prévio do tema do texto usado — pode estar mascarando uma dificuldade de repertório."
   );
+
+  // Caso Vitor (Fernanda): cenário mais desenvolvido — várias sessões ao
+  // longo de semanas, três hipóteses em estágios diferentes (uma pronta para
+  // decisão, uma confirmada, uma descartada) e uma conversa já registrada,
+  // para testar a interatividade do agente num caso com mais história.
+  const uFernanda = insertUser.run("Fernanda Alencar", "fernanda@espacoaprender.demo", "participante");
+  const pFernanda = insertParticipant.run(
+    uFernanda.lastInsertRowid,
+    "Fernanda Alencar",
+    "fernanda@espacoaprender.demo",
+    "Módulo 3 — Construção e teste de hipóteses",
+    "Já concluiu dois casos anteriores. Muito boa reunindo evidências; ainda hesita em fechar a decisão clínica no tempo certo."
+  );
+  const casoVitor = insertCase.run(
+    pFernanda.lastInsertRowid,
+    "Vitor",
+    10,
+    "Nenhum laudo até o momento — encaminhado pela coordenação pedagógica da escola.",
+    "5º ano — Escola Estadual Monteiro Lobato",
+    "Marcos (pai)",
+    "(11) 90000-0099",
+    "Compreensão leitora abaixo do esperado para a série; erra questões inferenciais mesmo lendo o texto corretamente em voz alta.",
+    "Identificar se a dificuldade é de decodificação, de processamento cognitivo (memória/inferência) ou de repertório de vocabulário, para orientar o plano de intervenção.",
+    "Se engaja bem em tarefas orais e temas de ciência/games; evita ler em voz alta e demonstra desconforto quando é corrigido na frente da turma."
+  );
+  const vitorId = casoVitor.lastInsertRowid;
+
+  const insertNote = db.prepare(
+    "INSERT INTO case_notes (workspace_id, case_id, data_sessao, conteudo, criado_por, criado_em) VALUES (1, ?, date('now', ?), ?, 'Fernanda Alencar', datetime('now', ?))"
+  );
+  insertNote.run(vitorId, "-24 days",
+    "Primeiro contato e aplicação da EOCA: Vitor mostrou boa fluência verbal e organização ao explorar os materiais, mas evitou ativamente tarefas de leitura e escrita, preferindo desenhar. Relatou não gostar de ler \"porque é chato\", sem verbalizar dificuldade específica.",
+    "-24 days");
+  insertNote.run(vitorId, "-17 days",
+    "Teste de consciência fonológica: desempenho dentro do esperado para a idade — segmentação e manipulação de fonemas preservadas, sem indícios de dificuldade fonológica de base.",
+    "-17 days");
+  insertNote.run(vitorId, "-10 days",
+    "Avaliação de compreensão leitora com perguntas literais e inferenciais: 90% de acerto em questões literais, 40% em inferenciais. Fluência de leitura em voz alta adequada, sem trocas ou omissões relevantes.",
+    "-10 days");
+  insertNote.run(vitorId, "-3 days",
+    "Conversa com a professora regente: relata que Vitor participa bem oralmente das discussões de texto em sala, mas trava quando precisa responder por escrito. Levanta a possibilidade de a dificuldade envolver também produção escrita, não só compreensão.",
+    "-3 days");
+
+  const insertHyp = db.prepare(
+    `INSERT INTO hypotheses (workspace_id, case_id, texto, status, evidencias_favor, evidencias_contra, criado_em, atualizado_em)
+     VALUES (1, ?, ?, ?, ?, ?, datetime('now', ?), datetime('now', ?))`
+  );
+  insertHyp.run(
+    vitorId,
+    "A dificuldade de Vitor é predominantemente de processamento inferencial — não de decodificação nem de consciência fonológica.",
+    "ativa",
+    "Fluência de leitura e consciência fonológica dentro do esperado; 90% de acerto em questões literais; boa participação oral em discussões de texto.",
+    "Ainda não foi testado se o desempenho oral se mantém quando a resposta precisa ser escrita — a professora sugere que parte do erro pode ser de produção escrita, não de compreensão em si.",
+    "-9 days", "-2 days"
+  );
+  insertHyp.run(
+    vitorId,
+    "A resistência à leitura em voz alta tem componente emocional (medo de errar na frente da turma), não só cognitivo.",
+    "confirmada",
+    "Evita ativamente tarefas de leitura mesmo com fluência adequada; verbalizou desconforto com correções públicas; comportamento consistente em mais de uma sessão.",
+    "",
+    "-23 days", "-16 days"
+  );
+  insertHyp.run(
+    vitorId,
+    "A dificuldade de compreensão decorre de um déficit de consciência fonológica de base.",
+    "descartada",
+    "",
+    "Teste de consciência fonológica dentro do esperado para a idade — hipótese não sustentada pelos dados.",
+    "-24 days", "-17 days"
+  );
+
+  const convVitor = db
+    .prepare("INSERT INTO conversations (workspace_id, participant_id, case_id, titulo, criado_em) VALUES (1, ?, ?, ?, datetime('now','-2 days'))")
+    .run(pFernanda.lastInsertRowid, vitorId, "A professora falou que ele trava só na escrita — muda a hipótese?");
+  insertMsg.run(
+    convVitor.lastInsertRowid, "usuario", "Fernanda Alencar",
+    "A professora falou que o Vitor participa bem oralmente mas trava pra responder por escrito. Isso muda minha hipótese?",
+    "[]"
+  );
+  insertMsg.run(
+    convVitor.lastInsertRowid, "assistente", "Mentor Clínico",
+    "Antes de mudarmos a hipótese, vale isolar uma coisa: quando você diz que ele \"trava\" por escrito, é a formulação da " +
+      "resposta que falha, ou a compreensão do texto que já não aparece nem oralmente quando a pergunta é sobre o mesmo " +
+      "trecho?\n\nPergunto isso porque, se a compreensão oral se mantém e só a resposta escrita falha, isso aponta mais " +
+      "para produção escrita do que para compreensão leitora — e mudaria o que você está de fato testando na hipótese 1.",
+    JSON.stringify([{ tipo: "hipotese", titulo: "Hipótese (ativa)" }, { tipo: "prontuario", titulo: "Registro de raciocínio — Vitor" }])
+  );
+
+  insertEvent.run(pFernanda.lastInsertRowid, vitorId, "sessao", "Fernanda aplicou a EOCA com Vitor.", "-24 days");
+  insertEvent.run(pFernanda.lastInsertRowid, vitorId, "hipotese", "Fernanda registrou uma nova hipótese clínica.", "-23 days");
+  insertEvent.run(pFernanda.lastInsertRowid, vitorId, "sessao", "Registro de raciocínio clínico adicionado ao caso.", "-17 days");
+  insertEvent.run(pFernanda.lastInsertRowid, vitorId, "sessao", "Registro de raciocínio clínico adicionado ao caso.", "-10 days");
+  insertEvent.run(pFernanda.lastInsertRowid, vitorId, "hipotese", "Fernanda registrou uma nova hipótese clínica.", "-9 days");
+  insertEvent.run(pFernanda.lastInsertRowid, vitorId, "sessao", "Registro de raciocínio clínico adicionado ao caso.", "-3 days");
+  insertEvent.run(pFernanda.lastInsertRowid, vitorId, "conversa", "Fernanda adicionou uma conversa com o mentor à linha do tempo.", "-2 days");
 }

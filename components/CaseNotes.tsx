@@ -66,7 +66,7 @@ export default function CaseNotes({ caseId, notas }: { caseId: number; notas: No
         <form onSubmit={salvar} className="mt-3 rounded-xl border border-[var(--grid)] bg-[var(--surface-low)] p-4 space-y-3">
           <label className="text-sm block">
             <span className="text-[var(--ink-2)]">Data</span>
-            <input type="date" value={data} onChange={(e) => setData(e.target.value)} required className="mt-1 rounded-lg border border-black/10 bg-white px-2.5 py-2 text-sm" />
+            <input type="date" value={data} onChange={(e) => setData(e.target.value)} required className="mt-1 w-full rounded-lg border border-black/10 bg-white px-2.5 py-2 text-sm" />
           </label>
           <label className="text-sm block">
             <span className="text-[var(--ink-2)]">O que foi observado, testado ou concluído</span>

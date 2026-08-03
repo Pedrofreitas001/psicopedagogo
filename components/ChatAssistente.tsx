@@ -38,7 +38,20 @@ export default function ChatAssistente({
   const [caseId, setCaseId] = useState<string>(casoFixo ? String(casoFixo) : permiteGeral ? GERAL : casos?.[0]?.id ? String(casos[0].id) : GERAL);
   const [conversationId, setConversationId] = useState<number | undefined>();
   const [loading, setLoading] = useState(false);
+  const [naLinhaDoTempo, setNaLinhaDoTempo] = useState(false);
+  const [adicionando, setAdicionando] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
+
+  async function adicionarALinhaDoTempo() {
+    if (!conversationId || adicionando) return;
+    setAdicionando(true);
+    try {
+      const res = await fetch(`/api/conversas/${conversationId}`, { method: "POST" });
+      if (res.ok) setNaLinhaDoTempo(true);
+    } finally {
+      setAdicionando(false);
+    }
+  }
 
   async function perguntar(texto: string) {
     const q = texto.trim();
@@ -69,6 +82,7 @@ export default function ChatAssistente({
     setCaseId(id);
     setConversationId(undefined);
     setMessages([]);
+    setNaLinhaDoTempo(false);
   }
 
   // O agente pode "falar primeiro": o card de próximo passo (ProximoPassoCaso)
@@ -161,6 +175,21 @@ export default function ChatAssistente({
           )
         )}
         {loading && <div className="text-sm text-[var(--ink-muted)] animate-pulse pl-11">Organizando o raciocínio…</div>}
+        {conversationId && !loading && (
+          <div className="pl-11">
+            {naLinhaDoTempo ? (
+              <span className="text-[12px] text-[var(--leaf)]">✓ Adicionada à linha do tempo do caso</span>
+            ) : (
+              <button
+                onClick={adicionarALinhaDoTempo}
+                disabled={adicionando}
+                className="text-[12px] text-[var(--ink-muted)] hover:text-[var(--brand-deep)] underline decoration-dotted disabled:opacity-50"
+              >
+                {adicionando ? "Adicionando…" : "+ Adicionar esta conversa à linha do tempo do caso"}
+              </button>
+            )}
+          </div>
+        )}
         <div ref={bottomRef} />
       </div>
 

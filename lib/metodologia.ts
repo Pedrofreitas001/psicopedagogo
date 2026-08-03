@@ -29,7 +29,7 @@ export function calcularEtapaCaso(assignments: ProtocolAssignment[], hipoteses: 
       numero: 6,
       titulo: "Ciclo concluído",
       descricao: "Todas as hipóteses já foram confirmadas ou descartadas.",
-      proximoPasso: "Reveja se a queixa principal foi respondida — se sim, considere encerrar o caso; se não, levante uma nova hipótese.",
+      proximoPasso: "Vamos revisar juntas se a queixa principal já foi respondida — ou se ainda vale levantar uma nova hipótese?",
       pergunta: "Já confirmamos ou descartamos as hipóteses deste caso. O que os dados que temos até aqui sugerem: a queixa principal já está respondida, ou ainda falta investigar algo?",
       concluido: true,
     };
@@ -40,7 +40,7 @@ export function calcularEtapaCaso(assignments: ProtocolAssignment[], hipoteses: 
       numero: 6,
       titulo: "Etapa 6 — Tomada de decisão clínica",
       descricao: "Há hipótese com evidências a favor e contra já registradas.",
-      proximoPasso: "Decida: qual hipótese é a mais consistente agora, e isso muda o plano de intervenção?",
+      proximoPasso: "Pronta para revisar a avaliação clínica e decidir qual hipótese é a mais consistente agora?",
       pergunta: "Já reuni evidências a favor e contra para uma das hipóteses deste caso. Pode me ajudar a decidir qual é a mais consistente agora, e qual deveria ser o próximo passo da avaliação?",
     };
   }
@@ -50,7 +50,7 @@ export function calcularEtapaCaso(assignments: ProtocolAssignment[], hipoteses: 
       numero: 5,
       titulo: "Etapa 5 — Busca de evidências",
       descricao: "Uma hipótese já tem evidência registrada de um dos lados.",
-      proximoPasso: "Continue reunindo o que confirma e o que enfraquece cada hipótese ativa.",
+      proximoPasso: "Quer continuar reunindo o que confirma e o que enfraquece essa hipótese?",
       pergunta: "Estou reunindo evidências para uma hipótese deste caso. O que mais eu deveria verificar para confirmar ou enfraquecer essa hipótese?",
     };
   }
@@ -60,7 +60,7 @@ export function calcularEtapaCaso(assignments: ProtocolAssignment[], hipoteses: 
       numero: 4,
       titulo: "Etapa 4 — Construção de hipóteses",
       descricao: "Já existe hipótese registrada, ainda sem evidências.",
-      proximoPasso: "Busque o que confirma e o que contradiz essa hipótese antes de segui-la adiante.",
+      proximoPasso: "Que tal discutirmos essa hipótese — o que ela sustenta, e se existe outra leitura possível?",
       pergunta: "Registrei uma hipótese para este caso. Que evidências, a favor ou contra, eu deveria buscar primeiro?",
     };
   }
@@ -70,7 +70,7 @@ export function calcularEtapaCaso(assignments: ProtocolAssignment[], hipoteses: 
       numero: 3,
       titulo: "Etapa 3 — Análise pelas duas lentes",
       descricao: "O protocolo foi concluído, mas ainda não há nenhuma hipótese.",
-      proximoPasso: "Olhe os dados pela lente de contexto e pela lente de processamento cognitivo, e levante a primeira hipótese.",
+      proximoPasso: "Que tal olharmos esse caso pela lente de contexto e pela lente de processamento cognitivo, para levantar a primeira hipótese?",
       pergunta: "Concluí o protocolo deste caso. Pela lente de contexto e pela lente de processamento cognitivo, que hipóteses esses dados sustentam?",
     };
   }
@@ -80,7 +80,7 @@ export function calcularEtapaCaso(assignments: ProtocolAssignment[], hipoteses: 
       numero: 2,
       titulo: "Etapa 2 — Identificação de lacunas",
       descricao: "Já há registro sobre o caso, mas o protocolo ainda não foi concluído.",
-      proximoPasso: "Termine de aplicar o protocolo — é isso que revela o que ainda falta saber.",
+      proximoPasso: "Vamos terminar de aplicar o protocolo? É isso que revela o que ainda falta saber.",
       pergunta: "Já tenho alguns dados registrados sobre este caso. O que ainda está faltando para eu entender melhor a situação?",
     };
   }
@@ -89,7 +89,7 @@ export function calcularEtapaCaso(assignments: ProtocolAssignment[], hipoteses: 
     numero: 1,
     titulo: "Etapa 1 — Organização dos dados",
     descricao: "O caso foi criado, mas ainda não há protocolo, notas ou hipóteses.",
-    proximoPasso: "Aplique um protocolo ou registre o primeiro raciocínio sobre o caso, para começar a organizar o que você já sabe.",
+    proximoPasso: "Pronta para começar a organizar o que você já sabe sobre este caso — preenchendo os dados que ainda faltam?",
     pergunta: "Acabei de cadastrar este caso. Quais informações eu já deveria ter em mãos antes de aplicar um protocolo?",
   };
 }
