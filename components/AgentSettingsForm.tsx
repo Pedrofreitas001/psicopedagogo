@@ -122,7 +122,7 @@ export default function AgentSettingsForm({ inicial }: { inicial: Settings }) {
             rows={3}
             value={v.instrucoesExtra}
             onChange={(e) => setV({ ...v, instrucoesExtra: e.target.value })}
-            placeholder="Ex.: sempre feche a resposta com uma pergunta; nunca sugira um diagnóstico, mesmo que a participante peça…"
+            placeholder="Ex.: sempre feche a resposta com uma pergunta; nunca sugira um diagnóstico, mesmo que a mentora peça…"
             className="mt-1 w-full rounded-lg border border-black/10 bg-white px-2.5 py-2 text-sm"
           />
         </label>

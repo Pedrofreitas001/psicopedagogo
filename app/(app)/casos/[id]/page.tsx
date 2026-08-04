@@ -137,6 +137,14 @@ export default async function CasoPage({ params }: { params: Promise<{ id: strin
         <CaseNotes caseId={caso.id} notas={notas} />
       </div>
 
+      <div id="mentor-caso" className={`${secao} scroll-mt-24`}>
+        <h2 className={tituloSecao}>
+          <span className={iconeSecao}>forum</span> Raciocinar sobre {caso.nome}
+        </h2>
+        <p className="mt-1 mb-4 text-[12.5px] text-[var(--ink-muted)]">A conversa fica registrada na linha do tempo deste caso.</p>
+        <ChatAssistente casoFixo={caso.id} />
+      </div>
+
       <div className={secao}>
         <div className="flex items-center justify-between">
           <h2 className={tituloSecao}>
@@ -160,14 +168,6 @@ export default async function CasoPage({ params }: { params: Promise<{ id: strin
           <span className={iconeSecao}>timeline</span> Linha do tempo do caso
         </h2>
         <Historico eventos={eventos} />
-      </div>
-
-      <div id="mentor-caso" className={`${secao} scroll-mt-24`}>
-        <h2 className={tituloSecao}>
-          <span className={iconeSecao}>forum</span> Raciocinar sobre {caso.nome}
-        </h2>
-        <p className="mt-1 mb-4 text-[12.5px] text-[var(--ink-muted)]">A conversa fica registrada na linha do tempo deste caso.</p>
-        <ChatAssistente casoFixo={caso.id} />
       </div>
     </div>
   );

@@ -13,7 +13,7 @@ export default async function ParticipantesPage() {
   return (
     <div className="max-w-2xl">
       <div className="flex items-center justify-between">
-        <h1 className="text-[26px] font-bold text-[var(--brand)]">Participantes</h1>
+        <h1 className="text-[26px] font-bold text-[var(--brand)]">Mentores</h1>
         <ParticipanteForm />
       </div>
       <div className="mt-6 card rounded-2xl divide-y divide-black/5">
@@ -36,7 +36,7 @@ export default async function ParticipantesPage() {
             </Link>
           );
         })}
-        {participantes.length === 0 && <p className="px-5 py-6 text-sm text-[var(--ink-muted)]">Cadastre a primeira participante para começar a mentoria.</p>}
+        {participantes.length === 0 && <p className="px-5 py-6 text-sm text-[var(--ink-muted)]">Cadastre a primeira mentora para começar a mentoria.</p>}
       </div>
     </div>
   );

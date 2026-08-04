@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import AjudaCampo from "./AjudaCampo";
 
 type Nota = { id: number; dataSessao: string; conteudo: string; criadoPor: string };
 
@@ -69,7 +70,10 @@ export default function CaseNotes({ caseId, notas }: { caseId: number; notas: No
             <input type="date" value={data} onChange={(e) => setData(e.target.value)} required className="mt-1 w-full rounded-lg border border-black/10 bg-white px-2.5 py-2 text-sm" />
           </label>
           <label className="text-sm block">
-            <span className="text-[var(--ink-2)]">O que foi observado, testado ou concluído</span>
+            <span className="text-[var(--ink-2)]">
+              O que foi observado, testado ou concluído
+              <AjudaCampo texto="Um registro datado do que aconteceu nesta sessão — o que você observou, testou, e o que isso te fez pensar. É esse material que o mentor de IA usa para lembrar o histórico do caso." />
+            </span>
             <textarea
               rows={4}
               value={conteudo}

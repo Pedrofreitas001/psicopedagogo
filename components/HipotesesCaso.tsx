@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import AjudaCampo from "./AjudaCampo";
 
 type Hipotese = {
   id: number;
@@ -80,7 +81,10 @@ export default function HipotesesCaso({ caseId, hipoteses }: { caseId: number; h
       {aberto && (
         <form onSubmit={salvar} className="mt-3 rounded-xl border border-[var(--grid)] bg-[var(--surface-low)] p-4 space-y-3">
           <label className="text-sm block">
-            <span className="text-[var(--ink-2)]">Hipótese</span>
+            <span className="text-[var(--ink-2)]">
+              Hipótese
+              <AjudaCampo texto="Uma frase clara sobre o que você acredita estar causando a dificuldade — não uma certeza, um palpite fundamentado que ainda vai ser testado." />
+            </span>
             <textarea
               rows={2}
               value={texto}
@@ -91,11 +95,17 @@ export default function HipotesesCaso({ caseId, hipoteses }: { caseId: number; h
             />
           </label>
           <label className="text-sm block">
-            <span className="text-[var(--ink-2)]">Evidências a favor</span>
+            <span className="text-[var(--ink-2)]">
+              Evidências a favor
+              <AjudaCampo texto="O que você já observou ou registrou que sustenta essa hipótese — dados concretos, não impressões gerais." />
+            </span>
             <textarea rows={2} value={evidenciasFavor} onChange={(e) => setEvidenciasFavor(e.target.value)} className="mt-1 w-full rounded-lg border border-black/10 bg-white px-2.5 py-2 text-sm" />
           </label>
           <label className="text-sm block">
-            <span className="text-[var(--ink-2)]">Evidências contra / o que ainda falta verificar</span>
+            <span className="text-[var(--ink-2)]">
+              Evidências contra / o que ainda falta verificar
+              <AjudaCampo texto="O que enfraquece essa hipótese, ou o que ainda falta investigar antes de confirmá-la — inclusive dados que você ainda não tem." />
+            </span>
             <textarea rows={2} value={evidenciasContra} onChange={(e) => setEvidenciasContra(e.target.value)} className="mt-1 w-full rounded-lg border border-black/10 bg-white px-2.5 py-2 text-sm" />
           </label>
           {erro && <p className="text-[13px] text-red-600">{erro}</p>}

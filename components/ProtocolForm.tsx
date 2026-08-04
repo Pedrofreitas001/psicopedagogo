@@ -2,6 +2,20 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import AjudaCampo from "./AjudaCampo";
+
+/** Para que serve cada seção do protocolo — em nível de seção, não campo a
+ * campo: o "porquê" de cada campo específico depende de conhecimento clínico
+ * que só a mentora tem (ver documento "O Mentor de IA", seção sobre o
+ * protocolo). Isto aqui é só a orientação estrutural, seção por seção. */
+const AJUDA_SECAO: Record<string, string> = {
+  "Identificação": "Dados de contexto do paciente e da aplicação — quem é, quando e com que texto o protocolo foi aplicado.",
+  "0. Antes da leitura": "O que a criança já sabe e sente sobre o tema antes de começar a ler — ajuda a diferenciar dificuldade de leitura de falta de interesse ou repertório.",
+  "1. Identificação e eficiência leitora": "Como a criança lê fisicamente: velocidade, precisão, fluência e comportamento durante a leitura — a base antes de avaliar se ela compreendeu.",
+  "2. Representação mental do texto": "O que sobrou na cabeça da criança depois de ler, testado pelo reconto livre, sem perguntas dirigidas.",
+  "3. Compreensão por questões": "Compreensão testada de forma dirigida, com perguntas — separa o que é explícito no texto do que exige inferência.",
+  "4. Síntese clínica": "O fechamento: cruza tudo o que foi observado para apontar hipóteses e o que ainda precisa ser investigado.",
+};
 
 type CampoTipo = "texto" | "textarea" | "numero" | "single_select" | "multi_select" | "tabela";
 type TabelaConfig = {
@@ -110,7 +124,10 @@ export default function ProtocolForm({
 
       {protocolo.secoes.map((secao) => (
         <div key={secao.id} className="card rounded-2xl p-6 border-t-2 border-[var(--leaf)]">
-          <h3 className="text-[15px] font-semibold mb-4">{secao.titulo}</h3>
+          <h3 className="text-[15px] font-semibold mb-4">
+            {secao.titulo}
+            {AJUDA_SECAO[secao.titulo] && <AjudaCampo texto={AJUDA_SECAO[secao.titulo]} />}
+          </h3>
           <div className="space-y-4">
             {secao.campos.map((campo) => (
               <CampoInput key={campo.id} campo={campo} valor={valores[campo.id] ?? null} onChange={(v) => set(campo.id, v)} onChangeCelula={(l, c, v) => setTabelaCelula(campo.id, l, c, v)} />

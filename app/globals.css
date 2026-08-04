@@ -5,7 +5,7 @@
  * Ícones Material Symbols hospedados localmente (subset de ~30 KB só com os
  * ícones usados no app). Para adicionar um ícone novo: inclua o nome na lista
  * `icon_names` da URL abaixo, baixe o woff2 resultante e substitua o arquivo.
- * https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&icon_names=arrow_back,assignment,attach_file,auto_stories,badge,cable,cases,dashboard,explore,fact_check,forum,group,history_edu,lightbulb,logout,person,psychology,save,send,settings,timeline&display=block
+ * https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&icon_names=arrow_back,assignment,attach_file,auto_stories,badge,cable,cases,dashboard,explore,fact_check,forum,group,history_edu,info,lightbulb,logout,person,psychology,save,send,settings,timeline&display=block
  */
 @font-face {
   font-family: "Material Symbols Outlined";
@@ -21,22 +21,22 @@
  * para que todos os componentes existentes ganhem o novo visual sem reescrita.
  */
 :root {
-  --page: #fbf7ee;               /* surface — creme quente */
+  --page: #f2e6c8;               /* surface — creme quente, mais saturado para o branco se destacar */
   --surface-1: #ffffff;          /* cards (surface-container-lowest) */
-  --surface-low: #fcf4e2;        /* surface-container-low */
-  --surface-container: #f3e6c4;  /* surface-container (sidebar) */
-  --surface-high: #eeddab;       /* surface-container-high */
+  --surface-low: #f6ecd4;        /* surface-container-low */
+  --surface-container: #ecdbac;  /* surface-container (sidebar) */
+  --surface-high: #e5cd8e;       /* surface-container-high */
   --ink-1: #241c10;              /* on-surface */
   --ink-2: #4a3d26;              /* on-surface-variant */
   --ink-muted: #8a7a56;          /* outline */
-  --grid: #e6d9af;               /* outline-variant suavizado */
+  --grid: #ddc98c;               /* outline-variant suavizado */
   --brand: #a9720e;              /* primary — âmbar/dourado */
   --brand-deep: #8a5b0b;         /* surface-tint (hover do primary) */
   --brand-container: #c98b1d;    /* primary-container */
   --leaf: #6b5b2e;               /* secondary — bronze/oliva */
   --leaf-container: #f1e3b8;     /* secondary-container */
-  --card-shadow: 0px 4px 20px rgba(154, 101, 10, 0.06);
-  --card-shadow-hover: 0px 10px 32px rgba(154, 101, 10, 0.12);
+  --card-shadow: 0px 1px 2px rgba(154, 101, 10, 0.06), 0px 6px 24px rgba(154, 101, 10, 0.12);
+  --card-shadow-hover: 0px 2px 4px rgba(154, 101, 10, 0.08), 0px 12px 36px rgba(154, 101, 10, 0.18);
 }
 
 body {
@@ -50,9 +50,11 @@ h1, h2, h3, h4 {
   letter-spacing: -0.01em;
 }
 
-/* Cartão padrão do novo layout — branco, sombra suave teal, leve lift no hover. */
+/* Cartão padrão do novo layout — branco puro contra o fundo âmbar, borda fina
+   + sombra em duas camadas para o branco se destacar com nitidez, leve lift no hover. */
 .card {
   background: var(--surface-1);
+  border: 1px solid rgba(154, 101, 10, 0.08);
   box-shadow: var(--card-shadow);
   transition: box-shadow 0.3s ease, transform 0.3s ease;
 }

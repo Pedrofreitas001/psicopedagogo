@@ -12,7 +12,7 @@ export default async function AssistentePage() {
           "Como eu decido entre hipótese de decodificação e de compreensão?",
           "Que evidências ainda preciso coletar?",
         ]
-      : ["Como conduzir uma participante que ainda não sabe organizar os dados do caso?", "O que o protocolo espera na etapa de hipóteses?"];
+      : ["Como conduzir uma mentora que ainda não sabe organizar os dados do caso?", "O que o protocolo espera na etapa de hipóteses?"];
 
   let casos: { id: number; nome: string }[] = [];
   let permiteGeral = false;
@@ -28,12 +28,24 @@ export default async function AssistentePage() {
   }
 
   return (
-    <div>
-      <h1 className="text-[26px] font-bold text-[var(--brand)]">Mentor Clínico</h1>
-      <p className="mt-1 mb-6 text-[13.5px] text-[var(--ink-muted)]">
-        Conduz o raciocínio clínico por perguntas — com base no protocolo, nas hipóteses e no histórico de cada caso.
-      </p>
-      <ChatAssistente casos={casos} permiteGeral={permiteGeral} sugestoes={sugestoes} />
+    <div className="max-w-3xl mx-auto h-full flex flex-col">
+      <div className="flex items-center gap-3 mb-5 shrink-0">
+        <div className="w-11 h-11 rounded-2xl bg-[var(--brand)]/10 text-[var(--brand)] grid place-items-center shrink-0">
+          <span className="material-symbols-outlined fill-icon text-[24px]">psychology</span>
+        </div>
+        <div>
+          <h1 className="text-[22px] font-bold text-[var(--brand)] leading-tight">Mentor Clínico</h1>
+          <p className="text-[13px] text-[var(--ink-muted)]">
+            Conduz o raciocínio clínico por perguntas — com base no protocolo, nas hipóteses e no histórico de cada caso.
+          </p>
+        </div>
+      </div>
+
+      <div className="card rounded-3xl flex-1 min-h-[520px] overflow-hidden flex flex-col">
+        <div className="flex-1 overflow-y-auto custom-scrollbar px-6 py-6">
+          <ChatAssistente casos={casos} permiteGeral={permiteGeral} sugestoes={sugestoes} />
+        </div>
+      </div>
     </div>
   );
 }

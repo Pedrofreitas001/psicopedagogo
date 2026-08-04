@@ -64,13 +64,13 @@ export default async function Home() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-        <StatCard icon="group" label="Participantes na mentoria" valor={participantes} accent="leaf" />
+        <StatCard icon="group" label="Mentores na mentoria" valor={participantes} accent="leaf" />
         <StatCard icon="cases" label="Casos clínicos ativos" valor={casosAtivos} accent="brand" />
         <StatCard icon="forum" label="Conversas registradas" valor={conversas} accent="tint" />
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-        <Card href="/participantes" icon="group" titulo="Participantes" descricao="A evolução de cada participante: estágio, casos clínicos e hipóteses." />
+        <Card href="/participantes" icon="group" titulo="Mentores" descricao="A evolução de cada mentora: estágio, casos clínicos e hipóteses." />
         <Card href="/biblioteca" icon="auto_stories" titulo="Biblioteca" descricao="Seus materiais organizados por pastas — a alma do sistema." />
         <Card href="/assistente" icon="psychology" titulo="Assistente" descricao="Converse com o agente no contexto de um caso clínico." />
         <Card href="/configuracoes" icon="settings" titulo="Configurações" descricao="Sua metodologia, o escopo do assistente e o modelo de IA." />

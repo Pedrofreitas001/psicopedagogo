@@ -44,7 +44,7 @@ export default function ParticipanteForm({ participanteId, valores }: { particip
             : "rounded-lg bg-[var(--brand)] hover:bg-[var(--brand-deep)] text-white px-4 py-2 text-sm font-medium"
         }
       >
-        {participanteId ? "Editar" : "+ Nova participante"}
+        {participanteId ? "Editar" : "+ Nova mentora"}
       </button>
     );
   }
@@ -60,7 +60,7 @@ export default function ParticipanteForm({ participanteId, valores }: { particip
           <input className={input} value={v.nome} onChange={(e) => setV({ ...v, nome: e.target.value })} required />
         </label>
         <label className="text-sm block col-span-2">
-          <span className={label}>Email (para o acesso da participante)</span>
+          <span className={label}>Email (para o acesso da mentora)</span>
           <input type="email" className={input} value={v.email} onChange={(e) => setV({ ...v, email: e.target.value })} />
         </label>
         <label className="text-sm block col-span-2">
