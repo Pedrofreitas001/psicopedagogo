@@ -2,21 +2,41 @@ import Link from "next/link";
 import { countParticipants, countActiveCases, countConversations, listCasesByParticipant } from "@/lib/data";
 import { getCurrentUser } from "@/lib/auth";
 
-function StatCard({ icon, label, valor, accent }: { icon: string; label: string; valor: number; accent: "brand" | "leaf" | "tint" }) {
+function StatCard({
+  icon,
+  label,
+  valor,
+  accent,
+  href,
+}: {
+  icon: string;
+  label: string;
+  valor: number;
+  accent: "brand" | "leaf" | "tint";
+  href?: string;
+}) {
   const cores = {
     brand: { borda: "border-[var(--brand-container)]", fundo: "bg-[var(--brand)]/10", texto: "text-[var(--brand)]" },
     leaf: { borda: "border-[var(--leaf)]", fundo: "bg-[var(--leaf)]/10", texto: "text-[var(--leaf)]" },
     tint: { borda: "border-[var(--brand-deep)]", fundo: "bg-[var(--brand-deep)]/10", texto: "text-[var(--brand-deep)]" },
   }[accent];
-  return (
-    <div className={`card rounded-xl p-6 border-t-2 ${cores.borda}`}>
+  const conteudo = (
+    <>
       <span className={`inline-flex p-2 rounded-lg ${cores.fundo} ${cores.texto}`}>
         <span className="material-symbols-outlined">{icon}</span>
       </span>
       <p className="mt-4 text-[13px] font-semibold tracking-wide text-[var(--ink-2)]">{label}</p>
       <p className="text-2xl font-bold text-[var(--ink-1)]" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>{valor}</p>
-    </div>
+    </>
   );
+  if (href) {
+    return (
+      <Link href={href} className={`card rounded-xl p-6 border-t-2 ${cores.borda} block hover:-translate-y-0.5 transition-transform`}>
+        {conteudo}
+      </Link>
+    );
+  }
+  return <div className={`card rounded-xl p-6 border-t-2 ${cores.borda}`}>{conteudo}</div>;
 }
 
 function Card({ href, icon, titulo, descricao }: { href: string; icon: string; titulo: string; descricao: string }) {
@@ -64,7 +84,7 @@ export default async function Home() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-        <StatCard icon="group" label="Mentores na mentoria" valor={participantes} accent="leaf" />
+        <StatCard icon="group" label="Mentores na mentoria" valor={participantes} accent="leaf" href="/participantes" />
         <StatCard icon="cases" label="Casos clínicos ativos" valor={casosAtivos} accent="brand" />
         <StatCard icon="forum" label="Conversas registradas" valor={conversas} accent="tint" />
       </div>

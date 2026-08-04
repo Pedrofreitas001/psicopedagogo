@@ -20,8 +20,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         authMode={authEnabled()}
       />
       <div className="flex-1 min-w-0 flex flex-col">
-        <header className="h-16 shrink-0 bg-[var(--surface-1)] border-b border-[var(--grid)] flex items-center justify-between px-8 sticky top-0 z-30 shadow-sm">
-          <span className="font-bold text-[16px] text-[var(--brand)]" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+        <header className="h-16 shrink-0 bg-[var(--surface-1)] border-b border-[var(--grid)] flex items-center justify-between pl-16 pr-5 md:px-8 sticky top-0 z-20 shadow-sm">
+          <span className="font-bold text-[16px] text-[var(--brand)] truncate" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
             {workspaceName}
           </span>
           <div className="flex items-center gap-3">
@@ -34,7 +34,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             </div>
           </div>
         </header>
-        <main className="flex-1 px-10 py-8 max-w-[1200px] w-full">{children}</main>
+        <main className="flex-1 px-4 py-6 md:px-10 md:py-8 max-w-[1200px] w-full">{children}</main>
       </div>
     </div>
   );

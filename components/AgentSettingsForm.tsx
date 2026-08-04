@@ -137,14 +137,22 @@ export default function AgentSettingsForm({ inicial }: { inicial: Settings }) {
       </div>
 
       <div className="pt-3 border-t border-black/6">
-        <button onClick={testarConexao} disabled={testando} className="rounded-lg border border-black/10 bg-white px-4 py-2 text-sm hover:bg-black/4 disabled:opacity-50">
-          {testando ? "Testando…" : "🔌 Testar conexão com a IA"}
+        <button
+          onClick={testarConexao}
+          disabled={testando}
+          className="inline-flex items-center gap-1.5 rounded-lg border border-black/10 bg-white px-4 py-2 text-sm hover:bg-black/4 disabled:opacity-50"
+        >
+          <span className="material-symbols-outlined text-[16px]">cable</span>
+          {testando ? "Testando…" : "Testar conexão com a IA"}
         </button>
         {teste && (
-          <p className={`mt-2 text-[12.5px] rounded-lg px-3 py-2 border ${teste.ok ? "text-emerald-700 bg-emerald-50 border-emerald-200" : "text-red-700 bg-red-50 border-red-200"}`}>
+          <p
+            className={`mt-2 inline-flex items-start gap-1.5 text-[12.5px] rounded-lg px-3 py-2 border ${teste.ok ? "text-emerald-700 bg-emerald-50 border-emerald-200" : "text-red-700 bg-red-50 border-red-200"}`}
+          >
+            <span className="material-symbols-outlined text-[15px] shrink-0 mt-px">{teste.ok ? "check_circle" : "cancel"}</span>
             {teste.ok
-              ? `✅ Conectado — modelo ${teste.modelo} respondeu: "${teste.resposta}"`
-              : `❌ Falhou (modelo ${teste.modelo ?? "?"}): ${teste.error}`}
+              ? `Conectado — modelo ${teste.modelo} respondeu: "${teste.resposta}"`
+              : `Falhou (modelo ${teste.modelo ?? "?"}): ${teste.error}`}
           </p>
         )}
       </div>

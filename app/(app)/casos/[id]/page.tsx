@@ -20,7 +20,15 @@ import UploadForm from "@/components/UploadForm";
 import ChatAssistente from "@/components/ChatAssistente";
 import ProximoPassoCaso from "@/components/ProximoPassoCaso";
 
-const ICONE: Record<string, string> = { pdf: "📕", docx: "📘", doc: "📘", pptx: "📙", ppt: "📙", xlsx: "📗", xls: "📗" };
+const ICONE: Record<string, string> = {
+  pdf: "picture_as_pdf",
+  docx: "description",
+  doc: "description",
+  pptx: "slideshow",
+  ppt: "slideshow",
+  xlsx: "table_chart",
+  xls: "table_chart",
+};
 
 function Campo({ titulo, valor }: { titulo: string; valor: string }) {
   return (
@@ -101,9 +109,29 @@ export default async function CasoPage({ params }: { params: Promise<{ id: strin
         </div>
       </div>
 
+      <nav className="sticky top-16 z-10 -mx-1 flex gap-1 overflow-x-auto px-1 py-2 bg-[var(--page)]/90 backdrop-blur-sm text-[12.5px]">
+        {[
+          { href: "#ficha", label: "Ficha" },
+          { href: "#hipoteses", label: "Hipóteses" },
+          { href: "#protocolos", label: "Protocolos" },
+          { href: "#registros", label: "Registros" },
+          { href: "#mentor-caso", label: "Raciocinar" },
+          { href: "#arquivos", label: "Arquivos" },
+          { href: "#linha-do-tempo", label: "Linha do tempo" },
+        ].map((s) => (
+          <a
+            key={s.href}
+            href={s.href}
+            className="shrink-0 rounded-full border border-[var(--grid)] bg-[var(--surface-1)] px-3 py-1.5 text-[var(--ink-2)] hover:border-[var(--brand)] hover:text-[var(--brand)] transition-colors"
+          >
+            {s.label}
+          </a>
+        ))}
+      </nav>
+
       <ProximoPassoCaso etapa={etapa} />
 
-      <div className={secao}>
+      <div id="ficha" className={`${secao} scroll-mt-24`}>
         <h2 className={`${tituloSecao} mb-4`}>
           <span className={iconeSecao}>badge</span> Ficha
         </h2>
@@ -125,15 +153,15 @@ export default async function CasoPage({ params }: { params: Promise<{ id: strin
         </div>
       </div>
 
-      <div className={secao}>
+      <div id="hipoteses" className={`${secao} scroll-mt-24`}>
         <HipotesesCaso caseId={caso.id} hipoteses={hipoteses} />
       </div>
 
-      <div className={secao}>
+      <div id="protocolos" className={`${secao} scroll-mt-24`}>
         <ProtocolosCaso caseId={caso.id} assignments={assignments} />
       </div>
 
-      <div className={secao}>
+      <div id="registros" className={`${secao} scroll-mt-24`}>
         <CaseNotes caseId={caso.id} notas={notas} />
       </div>
 
@@ -145,7 +173,7 @@ export default async function CasoPage({ params }: { params: Promise<{ id: strin
         <ChatAssistente casoFixo={caso.id} />
       </div>
 
-      <div className={secao}>
+      <div id="arquivos" className={`${secao} scroll-mt-24`}>
         <div className="flex items-center justify-between">
           <h2 className={tituloSecao}>
             <span className={iconeSecao}>attach_file</span> Arquivos
@@ -155,7 +183,10 @@ export default async function CasoPage({ params }: { params: Promise<{ id: strin
         <div className="mt-3 divide-y divide-black/5">
           {docs.map((d) => (
             <a key={d.id} href={`/api/documentos/${d.id}`} className="flex items-center gap-2.5 py-2.5 text-[13.5px] hover:text-[var(--brand-deep)]">
-              <span>{ICONE[d.tipo] ?? "📄"}</span> {d.nome}
+              <span className={`material-symbols-outlined text-[17px] ${ICONE[d.tipo] ? "text-[var(--brand-deep)]" : "text-[var(--ink-muted)]"}`}>
+                {ICONE[d.tipo] ?? "description"}
+              </span>
+              {d.nome}
               <span className="ml-auto text-[11.5px] text-[var(--ink-muted)]">{d.criadoEm.slice(0, 10).split("-").reverse().join("/")}</span>
             </a>
           ))}
@@ -163,7 +194,7 @@ export default async function CasoPage({ params }: { params: Promise<{ id: strin
         </div>
       </div>
 
-      <div className={secao}>
+      <div id="linha-do-tempo" className={`${secao} scroll-mt-24`}>
         <h2 className={`${tituloSecao} mb-4`}>
           <span className={iconeSecao}>timeline</span> Linha do tempo do caso
         </h2>
