@@ -213,8 +213,12 @@ $doc1$, true, 'Mariana Duarte');
     values (1, v_case2_id, v_protocol_id, current_date - 10, 'concluido', 'Fernanda Alencar (demo)', now() - interval '10 days', now() - interval '10 days')
     returning id into v_assignment_id;
 
+    -- IMPORTANTE: o app grava as respostas do protocolo com uma camada extra
+    -- de codificação JSON (lib/data.ts, saveResponses/getResponses) — grava
+    -- como texto duas vezes serializado, não como jsonb "limpo". Por isso o
+    -- to_jsonb(...::text) abaixo, e não um simples ::jsonb.
     insert into protocol_responses (assignment_id, field_id, valor)
-    select v_assignment_id, pf.id, valor::jsonb
+    select v_assignment_id, pf.id, to_jsonb((valor::jsonb)::text)
     from (values
       ('nome', '"Vitor"'),
       ('idade', '10'),
