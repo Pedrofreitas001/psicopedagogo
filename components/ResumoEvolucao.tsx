@@ -27,9 +27,10 @@ export default function ResumoEvolucao({ participantId }: { participantId: numbe
       <button
         onClick={gerar}
         disabled={loading}
-        className="rounded-lg bg-[var(--leaf)] hover:opacity-90 text-white px-4 py-2 text-sm font-medium disabled:opacity-50"
+        className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--leaf)] hover:opacity-90 text-white px-4 py-2 text-sm font-medium disabled:opacity-50"
       >
-        {loading ? "Lendo o histórico…" : "✨ Gerar resumo pré-encontro"}
+        <span className="material-symbols-outlined text-[16px]">auto_awesome</span>
+        {loading ? "Lendo o histórico…" : "Gerar resumo pré-encontro"}
       </button>
       {erro && <p className="mt-2 text-[13px] text-red-600">{erro}</p>}
       {resumo && (
