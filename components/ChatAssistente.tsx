@@ -9,12 +9,12 @@ type Msg =
   | { papel: "assistente"; texto: string; fontes: Fonte[]; recusado: boolean };
 
 const ROTULO_FONTE: Record<string, string> = {
-  documento: "📄",
-  metodologia: "🧭",
-  historico: "🕰️",
-  prontuario: "🗒️",
-  protocolo: "🧩",
-  hipotese: "💡",
+  documento: "attach_file",
+  metodologia: "explore",
+  historico: "timeline",
+  prontuario: "history_edu",
+  protocolo: "fact_check",
+  hipotese: "lightbulb",
 };
 
 const GERAL = "";
@@ -164,8 +164,13 @@ export default function ChatAssistente({
                 {msg.fontes.length > 0 && (
                   <div className="flex flex-wrap gap-1.5 text-[11.5px] text-[var(--ink-muted)]">
                     {msg.fontes.map((f, i) => (
-                      <span key={i} className="rounded-full bg-[var(--surface-low)] border border-[var(--grid)] px-2.5 py-0.5">
-                        {ROTULO_FONTE[f.tipo] ?? "•"} {f.titulo}
+                      <span key={i} className="inline-flex items-center gap-1 rounded-full bg-[var(--surface-low)] border border-[var(--grid)] px-2.5 py-0.5">
+                        {ROTULO_FONTE[f.tipo] && (
+                          <span className="material-symbols-outlined" style={{ fontSize: 12 }}>
+                            {ROTULO_FONTE[f.tipo]}
+                          </span>
+                        )}
+                        {f.titulo}
                       </span>
                     ))}
                   </div>

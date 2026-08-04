@@ -2,7 +2,15 @@
 
 import { useState } from "react";
 
-const ICONE: Record<string, string> = { conversa: "💬", material: "📚", observacao: "📝", resumo: "✨", sessao: "🗒️", protocolo: "🧩", hipotese: "💡" };
+const ICONE: Record<string, string> = {
+  conversa: "forum",
+  material: "auto_stories",
+  observacao: "assignment",
+  resumo: "auto_awesome",
+  sessao: "history_edu",
+  protocolo: "fact_check",
+  hipotese: "lightbulb",
+};
 const PAGINA = 8;
 
 function dataBr(iso: string): string {
@@ -29,8 +37,8 @@ export default function Historico({ eventos }: { eventos: { tipo: string; descri
       <ol className="relative border-l-2 border-[var(--grid)] pl-6 space-y-5">
         {pagina.map((e, i) => (
           <li key={i} className="relative">
-            <span className="absolute -left-[31px] top-0.5 grid h-5 w-5 place-items-center rounded-full bg-[var(--surface-1)] border border-black/10 text-[10px]">
-              {ICONE[e.tipo] ?? "•"}
+            <span className="absolute -left-[31px] top-0.5 grid h-5 w-5 place-items-center rounded-full bg-[var(--surface-1)] border border-black/10 text-[var(--brand-deep)]">
+              {ICONE[e.tipo] ? <span className="material-symbols-outlined" style={{ fontSize: 12 }}>{ICONE[e.tipo]}</span> : <span className="text-[10px]">•</span>}
             </span>
             <div className="text-[11.5px] text-[var(--ink-muted)]">{dataBr(e.criadoEm)}</div>
             <div className="text-[13.5px] text-[var(--ink-1)] leading-relaxed">{e.descricao}</div>

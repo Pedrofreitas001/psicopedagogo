@@ -5,7 +5,7 @@
  * Ícones Material Symbols hospedados localmente (subset de ~30 KB só com os
  * ícones usados no app). Para adicionar um ícone novo: inclua o nome na lista
  * `icon_names` da URL abaixo, baixe o woff2 resultante e substitua o arquivo.
- * https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&icon_names=arrow_back,assignment,attach_file,auto_stories,badge,cable,cases,dashboard,explore,fact_check,forum,group,history_edu,info,lightbulb,logout,person,psychology,save,send,settings,timeline&display=block
+ * https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&icon_names=arrow_back,assignment,attach_file,auto_awesome,auto_stories,badge,cable,cancel,cases,check_circle,close,dashboard,description,explore,fact_check,folder,forum,group,history_edu,info,lightbulb,logout,menu,person,picture_as_pdf,psychology,save,send,settings,slideshow,table_chart,timeline,warning&display=block
  */
 @font-face {
   font-family: "Material Symbols Outlined";

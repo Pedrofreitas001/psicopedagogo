@@ -6,7 +6,15 @@ import { useRouter } from "next/navigation";
 export type Cat = { id: number; nome: string; parentId: number | null };
 export type Doc = { id: number; categoriaId: number | null; nome: string; tipo: string; conteudo: string; disponivelAssistente: boolean };
 
-const ICONE: Record<string, string> = { pdf: "📕", docx: "📘", doc: "📘", pptx: "📙", ppt: "📙", xlsx: "📗", xls: "📗" };
+const ICONE: Record<string, string> = {
+  pdf: "picture_as_pdf",
+  docx: "description",
+  doc: "description",
+  pptx: "slideshow",
+  ppt: "slideshow",
+  xlsx: "table_chart",
+  xls: "table_chart",
+};
 
 function DocumentoLinha({ doc }: { doc: Doc }) {
   const router = useRouter();
@@ -50,7 +58,10 @@ function DocumentoLinha({ doc }: { doc: Doc }) {
     <div className="mt-1.5 ml-5 text-[13.5px] text-[var(--ink-2)]">
       <div className="flex items-center gap-2 flex-wrap">
         <a href={`/api/documentos/${doc.id}`} className="flex items-center gap-2 hover:text-[var(--brand-deep)]">
-          {ICONE[doc.tipo] ?? "📄"} {doc.nome}
+          <span className={`material-symbols-outlined text-[17px] ${ICONE[doc.tipo] ? "text-[var(--brand-deep)]" : "text-[var(--ink-muted)]"}`}>
+            {ICONE[doc.tipo] ?? "description"}
+          </span>
+          {doc.nome}
         </a>
         {temConteudo ? (
           <button
@@ -118,7 +129,10 @@ function Pasta({ cat, cats, docs, nivel }: { cat: Cat; cats: Cat[]; docs: Doc[];
   return (
     <div style={{ marginLeft: nivel * 16 }} className="mt-3">
       <div className="flex items-center gap-2">
-        <span className="text-[14px] font-semibold">📁 {cat.nome}</span>
+        <span className="flex items-center gap-1.5 text-[14px] font-semibold">
+          <span className="material-symbols-outlined text-[17px] text-[var(--brand-deep)]">folder</span>
+          {cat.nome}
+        </span>
         <button onClick={excluirPasta} className="text-[11px] text-[var(--ink-muted)] hover:text-red-600">
           excluir pasta
         </button>

@@ -3,7 +3,15 @@ import { listCategories, listLibraryDocuments } from "@/lib/data";
 type Cat = { id: number; nome: string; parentId: number | null };
 type Doc = { id: number; categoriaId: number | null; nome: string; tipo: string };
 
-const ICONE: Record<string, string> = { pdf: "📕", docx: "📘", doc: "📘", pptx: "📙", ppt: "📙", xlsx: "📗", xls: "📗" };
+const ICONE: Record<string, string> = {
+  pdf: "picture_as_pdf",
+  docx: "description",
+  doc: "description",
+  pptx: "slideshow",
+  ppt: "slideshow",
+  xlsx: "table_chart",
+  xls: "table_chart",
+};
 
 function Pasta({ cat, cats, docs, nivel }: { cat: Cat; cats: Cat[]; docs: Doc[]; nivel: number }) {
   const filhas = cats.filter((c) => c.parentId === cat.id);
@@ -11,14 +19,20 @@ function Pasta({ cat, cats, docs, nivel }: { cat: Cat; cats: Cat[]; docs: Doc[];
   if (filhas.length === 0 && arquivos.length === 0) return null;
   return (
     <div style={{ marginLeft: nivel * 16 }} className="mt-3">
-      <div className="text-[14px] font-semibold text-[var(--ink-1)]">📁 {cat.nome}</div>
+      <div className="flex items-center gap-1.5 text-[14px] font-semibold text-[var(--ink-1)]">
+        <span className="material-symbols-outlined text-[17px] text-[var(--brand-deep)]">folder</span>
+        {cat.nome}
+      </div>
       {arquivos.map((d) => (
         <a
           key={d.id}
           href={`/api/documentos/${d.id}`}
           className="mt-1.5 ml-5 flex items-center gap-2 text-[13.5px] text-[var(--ink-2)] hover:text-[var(--brand-deep)]"
         >
-          {ICONE[d.tipo] ?? "📄"} {d.nome}
+          <span className={`material-symbols-outlined text-[17px] ${ICONE[d.tipo] ? "text-[var(--brand-deep)]" : "text-[var(--ink-muted)]"}`}>
+            {ICONE[d.tipo] ?? "description"}
+          </span>
+          {d.nome}
         </a>
       ))}
       {filhas.map((f) => (

@@ -40,10 +40,15 @@ export default function Sidebar({
   const current = users.find((u) => u.id === currentUserId) ?? users[0];
   const nav = currentUserPapel === "mentora" ? NAV_MENTORA : NAV_PARTICIPANTE;
   const [colapsada, setColapsada] = useState(false);
+  const [abertaMobile, setAbertaMobile] = useState(false);
 
   useEffect(() => {
     if (localStorage.getItem(CHAVE_COLAPSO) === "1") setColapsada(true);
   }, []);
+
+  useEffect(() => {
+    setAbertaMobile(false);
+  }, [pathname]);
 
   function alternarColapso() {
     setColapsada((v) => {
@@ -65,16 +70,36 @@ export default function Sidebar({
   }
 
   return (
-    <aside
-      className={`${colapsada ? "w-[76px]" : "w-64"} shrink-0 sticky top-0 h-screen bg-[var(--surface-container)] border-r border-[var(--grid)] flex flex-col py-6 z-40 transition-[width] duration-200 ease-in-out relative`}
-    >
+    <>
       <button
-        onClick={alternarColapso}
-        title={colapsada ? "Expandir menu" : "Recolher menu"}
-        className="absolute -right-3 top-8 w-6 h-6 rounded-full bg-[var(--surface-1)] border border-[var(--grid)] shadow-sm grid place-items-center text-[var(--ink-muted)] hover:text-[var(--brand)] hover:border-[var(--brand)] z-10"
+        onClick={() => setAbertaMobile(true)}
+        title="Abrir menu"
+        className="md:hidden fixed top-3.5 left-4 z-30 w-9 h-9 rounded-lg bg-[var(--surface-1)] border border-[var(--grid)] shadow-sm grid place-items-center text-[var(--ink-2)]"
       >
-        <span className={`material-symbols-outlined text-[15px] transition-transform duration-200 ${colapsada ? "" : "rotate-180"}`}>arrow_back</span>
+        <span className="material-symbols-outlined text-[20px]">menu</span>
       </button>
+      {abertaMobile && (
+        <div className="md:hidden fixed inset-0 bg-black/40 z-40" onClick={() => setAbertaMobile(false)} />
+      )}
+      <aside
+        className={`${colapsada ? "md:w-[76px]" : "md:w-64"} ${
+          abertaMobile ? "translate-x-0" : "-translate-x-full"
+        } w-64 fixed inset-y-0 left-0 md:translate-x-0 md:sticky md:top-0 shrink-0 h-screen bg-[var(--surface-container)] border-r border-[var(--grid)] flex flex-col py-6 z-50 transition-[width,transform] duration-200 ease-in-out`}
+      >
+        <button
+          onClick={() => setAbertaMobile(false)}
+          title="Fechar menu"
+          className="md:hidden absolute right-4 top-4 w-8 h-8 rounded-full grid place-items-center text-[var(--ink-muted)] hover:bg-black/5"
+        >
+          <span className="material-symbols-outlined text-[20px]">close</span>
+        </button>
+        <button
+          onClick={alternarColapso}
+          title={colapsada ? "Expandir menu" : "Recolher menu"}
+          className="hidden md:grid absolute -right-3 top-8 w-6 h-6 rounded-full bg-[var(--surface-1)] border border-[var(--grid)] shadow-sm place-items-center text-[var(--ink-muted)] hover:text-[var(--brand)] hover:border-[var(--brand)] z-10"
+        >
+          <span className={`material-symbols-outlined text-[15px] transition-transform duration-200 ${colapsada ? "" : "rotate-180"}`}>arrow_back</span>
+        </button>
 
       <div className={`mb-8 ${colapsada ? "px-3" : "px-6"}`}>
         <div className={`flex items-center gap-3 ${colapsada ? "justify-center" : ""}`}>
@@ -152,6 +177,7 @@ export default function Sidebar({
           </label>
         )}
       </div>
-    </aside>
+      </aside>
+    </>
   );
 }
