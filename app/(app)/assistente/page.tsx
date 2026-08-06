@@ -28,23 +28,21 @@ export default async function AssistentePage() {
   }
 
   return (
-    <div className="max-w-3xl mx-auto h-full flex flex-col">
-      <div className="flex items-center gap-3 mb-5 shrink-0">
-        <div className="w-11 h-11 rounded-2xl bg-[var(--brand)]/10 text-[var(--brand)] grid place-items-center shrink-0">
-          <span className="material-symbols-outlined fill-icon text-[24px]">psychology</span>
+    <div className="-mx-4 -my-6 md:-mx-10 md:-my-8 h-[calc(100vh-4rem)] flex flex-col">
+      <div className="shrink-0 flex items-center gap-3 px-4 md:px-10 py-4 border-b border-[var(--grid)] bg-[var(--surface-1)]">
+        <div className="w-10 h-10 rounded-2xl bg-[var(--brand)]/10 text-[var(--brand)] grid place-items-center shrink-0">
+          <span className="material-symbols-outlined fill-icon text-[22px]">psychology</span>
         </div>
-        <div>
-          <h1 className="text-[22px] font-bold text-[var(--brand)] leading-tight">Mentor Clínico</h1>
-          <p className="text-[13px] text-[var(--ink-muted)]">
+        <div className="min-w-0">
+          <h1 className="text-[18px] font-bold text-[var(--brand)] leading-tight">Mentor Clínico</h1>
+          <p className="text-[12.5px] text-[var(--ink-muted)] truncate">
             Conduz o raciocínio clínico por perguntas — com base no protocolo, nas hipóteses e no histórico de cada caso.
           </p>
         </div>
       </div>
 
-      <div className="card rounded-3xl flex-1 min-h-[520px] overflow-hidden flex flex-col">
-        <div className="flex-1 overflow-y-auto custom-scrollbar px-6 py-6">
-          <ChatAssistente casos={casos} permiteGeral={permiteGeral} sugestoes={sugestoes} />
-        </div>
+      <div className="flex-1 min-h-0 px-4 md:px-10 py-5 max-w-4xl w-full mx-auto flex flex-col">
+        <ChatAssistente casos={casos} permiteGeral={permiteGeral} sugestoes={sugestoes} alturaFixa />
       </div>
     </div>
   );

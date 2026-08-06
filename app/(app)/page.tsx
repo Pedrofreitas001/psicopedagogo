@@ -59,12 +59,12 @@ export default async function Home() {
     const casos = user.participantId ? await listCasesByParticipant(user.participantId) : [];
     const ativos = casos.filter((c) => c.status === "ativo").length;
     return (
-      <div className="max-w-3xl">
+      <div className="max-w-5xl">
         <h1 className="text-[28px] font-bold text-[var(--brand)]">Olá, {primeiroNome}</h1>
         <p className="mt-1 text-[15px] text-[var(--ink-2)]">
           {ativos} caso(s) ativo(s) em análise · {casos.length} caso(s) no total.
         </p>
-        <div className="mt-8 grid grid-cols-1 sm:grid-cols-2 gap-5">
+        <div className="mt-8 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
           <Card href="/casos" icon="cases" titulo="Meus Casos" descricao="Os casos clínicos que você está analisando na mentoria." />
           <Card href="/assistente" icon="psychology" titulo="Assistente" descricao="Converse com o mentor clínico sobre um caso ou uma dúvida geral." />
           <Card href="/materiais" icon="auto_stories" titulo="Materiais" descricao="Os conteúdos que a mentora preparou para a formação." />
@@ -77,19 +77,19 @@ export default async function Home() {
   const primeiroNome = user.nome.split(" ")[0];
 
   return (
-    <div className="max-w-4xl space-y-8">
+    <div className="max-w-6xl space-y-8">
       <div>
         <h1 className="text-[28px] font-bold text-[var(--brand)]">Olá, {primeiroNome}</h1>
         <p className="mt-1 text-[15px] text-[var(--ink-2)]">Visão geral da mentoria.</p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
         <StatCard icon="group" label="Mentores na mentoria" valor={participantes} accent="leaf" href="/participantes" />
         <StatCard icon="cases" label="Casos clínicos ativos" valor={casosAtivos} accent="brand" />
         <StatCard icon="forum" label="Conversas registradas" valor={conversas} accent="tint" />
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
         <Card href="/participantes" icon="group" titulo="Mentores" descricao="A evolução de cada mentora: estágio, casos clínicos e hipóteses." />
         <Card href="/biblioteca" icon="auto_stories" titulo="Biblioteca" descricao="Seus materiais organizados por pastas — a alma do sistema." />
         <Card href="/assistente" icon="psychology" titulo="Assistente" descricao="Converse com o agente no contexto de um caso clínico." />
