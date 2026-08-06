@@ -147,9 +147,9 @@ export default function AgentSettingsForm({ inicial }: { inicial: Settings }) {
         </button>
         {teste && (
           <p
-            className={`mt-2 text-[12.5px] rounded-lg px-3 py-2 border font-medium ${teste.ok ? "text-emerald-700 bg-emerald-50 border-emerald-200" : "text-red-700 bg-red-50 border-red-200"}`}
+            className={`mt-2 inline-flex items-start gap-1.5 text-[12.5px] rounded-lg px-3 py-2 border ${teste.ok ? "text-emerald-700 bg-emerald-50 border-emerald-200" : "text-red-700 bg-red-50 border-red-200"}`}
           >
-            {teste.ok ? "✓ " : "✕ "}
+            <span className="material-symbols-outlined text-[15px] shrink-0 mt-px">{teste.ok ? "check_circle" : "cancel"}</span>
             {teste.ok
               ? `Conectado — modelo ${teste.modelo} respondeu: "${teste.resposta}"`
               : `Falhou (modelo ${teste.modelo ?? "?"}): ${teste.error}`}

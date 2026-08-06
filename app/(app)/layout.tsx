@@ -11,7 +11,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const [users, workspaceName] = await Promise.all([listUsers(), getWorkspaceName()]);
 
   return (
-    <div className="flex min-h-screen">
+    <div className="flex h-dvh overflow-hidden">
       <Sidebar
         users={users}
         currentUserId={current.id}
@@ -19,8 +19,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         workspaceName={workspaceName}
         authMode={authEnabled()}
       />
-      <div className="flex-1 min-w-0 flex flex-col">
-        <header className="h-16 shrink-0 bg-[var(--surface-1)] border-b border-[var(--grid)] flex items-center justify-between pl-16 pr-5 md:px-8 sticky top-0 z-20 shadow-sm">
+      <div className="flex-1 min-w-0 flex flex-col h-dvh">
+        <header className="h-16 shrink-0 bg-[var(--surface-1)] border-b border-[var(--grid)] flex items-center justify-between pl-16 pr-5 md:px-8 z-20 shadow-sm">
           <span className="font-bold text-[16px] text-[var(--brand)] truncate" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
             {workspaceName}
           </span>
@@ -34,7 +34,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             </div>
           </div>
         </header>
-        <main className="flex-1 px-4 py-6 md:px-10 md:py-8 max-w-[1700px] w-full">{children}</main>
+        <main className="flex-1 min-h-0 overflow-y-auto px-4 py-6 md:px-10 md:py-8 max-w-[1700px] w-full">{children}</main>
       </div>
     </div>
   );
