@@ -28,8 +28,8 @@ export default async function AssistentePage() {
   }
 
   return (
-    <div className="-mx-4 -my-6 md:-mx-10 md:-my-8 h-[calc(100vh-4rem)] flex flex-col">
-      <div className="shrink-0 flex items-center gap-3 px-4 md:px-10 py-4 border-b border-[var(--grid)] bg-[var(--surface-1)]">
+    <div className="h-full min-h-0 flex flex-col bg-[var(--surface-1)] rounded-2xl border border-[var(--grid)] shadow-[var(--card-shadow)] overflow-hidden">
+      <div className="shrink-0 flex items-center gap-3 px-5 md:px-8 py-4 border-b border-[var(--grid)] bg-[var(--surface-1)]">
         <div className="w-10 h-10 rounded-2xl bg-[var(--brand)]/10 text-[var(--brand)] grid place-items-center shrink-0">
           <span className="material-symbols-outlined fill-icon text-[22px]">psychology</span>
         </div>
@@ -41,8 +41,10 @@ export default async function AssistentePage() {
         </div>
       </div>
 
-      <div className="flex-1 min-h-0 px-4 md:px-10 py-5 max-w-4xl w-full mx-auto flex flex-col">
-        <ChatAssistente casos={casos} permiteGeral={permiteGeral} sugestoes={sugestoes} alturaFixa />
+      <div className="flex-1 min-h-0 flex justify-center bg-[var(--surface-1)] overflow-hidden">
+        <div className="w-full max-w-4xl h-full min-h-0 px-5 md:px-8 py-5 flex flex-col">
+          <ChatAssistente casos={casos} permiteGeral={permiteGeral} sugestoes={sugestoes} alturaFixa />
+        </div>
       </div>
     </div>
   );
