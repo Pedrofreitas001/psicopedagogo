@@ -2,18 +2,14 @@
 @import "tailwindcss";
 
 /*
- * Ícones Material Symbols hospedados localmente (subset de ~30 KB só com os
- * ícones usados no app). Para adicionar um ícone novo: inclua o nome na lista
- * `icon_names` da URL abaixo, baixe o woff2 resultante e substitua o arquivo.
- * https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&icon_names=arrow_back,assignment,attach_file,auto_awesome,auto_stories,badge,cable,cancel,cases,check_circle,close,dashboard,description,explore,fact_check,folder,forum,group,history_edu,info,lightbulb,logout,menu,person,picture_as_pdf,psychology,save,send,settings,slideshow,table_chart,timeline,warning&display=block
+ * TEMPORARIO: enquanto o pipeline de sync binaria (git) esta indisponivel,
+ * os icones Material Symbols sao carregados via Google Fonts em vez do
+ * arquivo local /fonts/material-symbols-subset.woff2 (que ainda nao tem os
+ * icones novos: auto_awesome, cancel, check_circle, close, description,
+ * folder, menu, picture_as_pdf, slideshow, table_chart, warning). Reverter
+ * para o @font-face local assim que o proximo git push completo acontecer.
  */
-@font-face {
-  font-family: "Material Symbols Outlined";
-  font-style: normal;
-  font-weight: 100 700;
-  font-display: block;
-  src: url("/fonts/material-symbols-subset.woff2") format("woff2");
-}
+@import url("https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&icon_names=arrow_back,assignment,attach_file,auto_awesome,auto_stories,badge,cable,cancel,cases,check_circle,close,dashboard,description,explore,fact_check,folder,forum,group,history_edu,info,lightbulb,logout,menu,person,picture_as_pdf,psychology,save,send,settings,slideshow,table_chart,timeline,warning&display=block");
 
 /*
  * Design system "Professional Care" (Google Stitch) — Material 3, tom âmbar/dourado.
