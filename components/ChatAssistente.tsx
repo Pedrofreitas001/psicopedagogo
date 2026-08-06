@@ -24,6 +24,7 @@ export default function ChatAssistente({
   casoFixo,
   permiteGeral,
   sugestoes,
+  alturaFixa,
 }: {
   /** Para a mentora (ou participante fora de um caso fixo): lista de casos para escolher o contexto da conversa */
   casos?: { id: number; nome: string }[];
@@ -32,6 +33,9 @@ export default function ChatAssistente({
   /** Permite conversar sem escolher um caso (dúvidas gerais da participante) */
   permiteGeral?: boolean;
   sugestoes?: string[];
+  /** Aba Assistente: ocupa a altura fixa do contêiner pai, só a lista de mensagens rola.
+   * Sem isso (uso inline na página do caso): flui com a página, input fica sticky. */
+  alturaFixa?: boolean;
 }) {
   const [messages, setMessages] = useState<Msg[]>([]);
   const [input, setInput] = useState("");
@@ -98,20 +102,22 @@ export default function ChatAssistente({
     return () => window.removeEventListener("iniciar-mentor", aoIniciar);
   }, []);
 
-  return (
-    <div className="flex flex-col gap-4 max-w-2xl">
-      {casos && casos.length > 0 && !casoFixo && (
-        <label className="text-sm text-[var(--ink-2)] flex items-center gap-2">
-          Conversando sobre:
-          <select value={caseId} onChange={(e) => trocarCaso(e.target.value)} className="rounded-md border border-black/10 bg-white px-2.5 py-1.5 text-sm">
-            {permiteGeral && <option value={GERAL}>Conversa geral (sem caso específico)</option>}
-            {casos.map((c) => (
-              <option key={c.id} value={c.id}>{c.nome}</option>
-            ))}
-          </select>
-        </label>
-      )}
+  const seletorCaso = casos && casos.length > 0 && !casoFixo && (
+    <div className={alturaFixa ? "shrink-0 pb-3 mb-1 border-b border-[var(--grid)]" : ""}>
+      <label className="text-sm text-[var(--ink-2)] flex items-center gap-2">
+        Conversando sobre:
+        <select value={caseId} onChange={(e) => trocarCaso(e.target.value)} className="rounded-md border border-black/10 bg-white px-2.5 py-1.5 text-sm">
+          {permiteGeral && <option value={GERAL}>Conversa geral (sem caso específico)</option>}
+          {casos.map((c) => (
+            <option key={c.id} value={c.id}>{c.nome}</option>
+          ))}
+        </select>
+      </label>
+    </div>
+  );
 
+  const listaMensagens = (
+    <>
       {messages.length === 0 && (
         <div className="text-center py-10 space-y-3">
           <div className="w-20 h-20 bg-[var(--leaf-container)]/50 rounded-full flex items-center justify-center mx-auto">
@@ -137,7 +143,7 @@ export default function ChatAssistente({
         </div>
       )}
 
-      <div className="space-y-6">
+      <div className="space-y-6 py-1">
         {messages.map((msg, idx) =>
           msg.papel === "usuario" ? (
             <div key={idx} className="flex justify-end gap-3 items-start">
@@ -197,33 +203,53 @@ export default function ChatAssistente({
         )}
         <div ref={bottomRef} />
       </div>
+    </>
+  );
 
-      <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          perguntar(input);
-        }}
-        className="sticky bottom-4"
-      >
-        <div className="flex items-center bg-white rounded-[24px] border border-[var(--grid)] shadow-lg p-2 gap-2">
-          <input
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            placeholder="Conte o que você observou…"
-            className="flex-1 bg-transparent border-none px-3 py-2.5 text-sm focus:outline-none"
-          />
-          <button
-            type="submit"
-            disabled={loading || !input.trim()}
-            className="bg-[var(--brand)] hover:bg-[var(--brand-deep)] text-white w-11 h-11 rounded-full flex items-center justify-center shadow-md transition-all active:scale-90 disabled:opacity-40"
-          >
-            <span className="material-symbols-outlined text-[20px]">send</span>
-          </button>
-        </div>
-        <p className="mt-2 text-center text-[11px] text-[var(--ink-muted)]/70">
-          O agente não diagnostica nem substitui a supervisão da mentora — a decisão final é sempre sua.
-        </p>
-      </form>
+  const formulario = (
+    <form
+      onSubmit={(e) => {
+        e.preventDefault();
+        perguntar(input);
+      }}
+      className={alturaFixa ? "shrink-0 pt-4" : "sticky bottom-4"}
+    >
+      <div className="flex items-center bg-white rounded-[24px] border border-[var(--grid)] shadow-lg p-2 gap-2">
+        <input
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          placeholder="Conte o que você observou…"
+          className="flex-1 bg-transparent border-none px-3 py-2.5 text-sm focus:outline-none"
+        />
+        <button
+          type="submit"
+          disabled={loading || !input.trim()}
+          className="bg-[var(--brand)] hover:bg-[var(--brand-deep)] text-white w-11 h-11 rounded-full flex items-center justify-center shadow-md transition-all active:scale-90 disabled:opacity-40"
+        >
+          <span className="material-symbols-outlined text-[20px]">send</span>
+        </button>
+      </div>
+      <p className="mt-2 text-center text-[11px] text-[var(--ink-muted)]/70">
+        O agente não diagnostica nem substitui a supervisão da mentora — a decisão final é sempre sua.
+      </p>
+    </form>
+  );
+
+  if (alturaFixa) {
+    return (
+      <div className="flex flex-col h-full min-h-0">
+        {seletorCaso}
+        <div className="flex-1 min-h-0 overflow-y-auto custom-scrollbar">{listaMensagens}</div>
+        {formulario}
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-4 max-w-2xl">
+      {seletorCaso}
+      {listaMensagens}
+      {formulario}
     </div>
   );
 }

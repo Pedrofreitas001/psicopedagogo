@@ -4,6 +4,10 @@ import { listParticipantsWithLastEvent, listCasesByParticipant } from "@/lib/dat
 import { getCurrentUser } from "@/lib/auth";
 import ParticipanteForm from "@/components/ParticipanteForm";
 
+function dataBr(iso: string): string {
+  return iso.slice(0, 10).split("-").reverse().join("/");
+}
+
 export default async function ParticipantesPage() {
   const user = (await getCurrentUser())!;
   if (user.papel !== "mentora") redirect("/");
@@ -11,32 +15,62 @@ export default async function ParticipantesPage() {
   const casosPorParticipante = await Promise.all(participantes.map((p) => listCasesByParticipant(p.id)));
 
   return (
-    <div className="max-w-2xl">
+    <div className="max-w-6xl">
       <div className="flex items-center justify-between">
-        <h1 className="text-[26px] font-bold text-[var(--brand)]">Mentores</h1>
+        <div>
+          <h1 className="text-[26px] font-bold text-[var(--brand)]">Mentores</h1>
+          <p className="mt-1 text-[13.5px] text-[var(--ink-muted)]">A evolução de cada mentora: estágio, casos clínicos e hipóteses.</p>
+        </div>
         <ParticipanteForm />
       </div>
-      <div className="mt-6 card rounded-2xl divide-y divide-black/5">
+
+      <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-5">
         {participantes.map((p, i) => {
           const casos = casosPorParticipante[i];
           const ativos = casos.filter((c) => c.status === "ativo").length;
           return (
-            <Link key={p.id} href={`/participantes/${p.id}`} className="flex items-center gap-3 px-5 py-4 hover:bg-black/2">
-              <div className="h-9 w-9 rounded-full bg-[var(--brand)]/12 text-[var(--brand-deep)] grid place-items-center text-sm font-semibold shrink-0">
-                {p.nome.slice(0, 1).toUpperCase()}
+            <Link
+              key={p.id}
+              href={`/participantes/${p.id}`}
+              className="card rounded-2xl p-5 flex flex-col gap-4 border-t-2 border-[var(--brand-container)] hover:-translate-y-0.5 transition-transform"
+            >
+              <div className="flex items-center gap-3">
+                <div
+                  className="h-12 w-12 rounded-full bg-[var(--brand)]/12 text-[var(--brand-deep)] grid place-items-center text-[16px] font-semibold shrink-0"
+                  style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}
+                >
+                  {p.nome.slice(0, 1).toUpperCase()}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="text-[15px] font-semibold truncate">{p.nome}</div>
+                  <div className="text-[12px] text-[var(--ink-muted)] truncate">{p.estagioMentoria || "Estágio não definido"}</div>
+                </div>
               </div>
-              <div className="min-w-0 flex-1">
-                <div className="text-[14px] font-medium">{p.nome}</div>
-                <div className="text-[12.5px] text-[var(--ink-muted)] truncate">{p.estagioMentoria || "Estágio não definido"}</div>
+
+              <div className="grid grid-cols-2 gap-2 pt-3 border-t border-[var(--grid)]">
+                <div>
+                  <div className="text-[20px] font-bold text-[var(--ink-1)]" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                    {casos.length}
+                  </div>
+                  <div className="text-[11px] text-[var(--ink-muted)]">caso(s)</div>
+                </div>
+                <div>
+                  <div className="text-[20px] font-bold text-[var(--leaf)]" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                    {ativos}
+                  </div>
+                  <div className="text-[11px] text-[var(--ink-muted)]">ativo(s)</div>
+                </div>
               </div>
-              <div className="text-[11.5px] text-[var(--ink-muted)] shrink-0 text-right">
-                <div>{casos.length} caso(s) · {ativos} ativo(s)</div>
-                <div>{p.ultimoEvento ? `último registro ${p.ultimoEvento.slice(0, 10).split("-").reverse().join("/")}` : "sem registros"}</div>
+
+              <div className="text-[11px] text-[var(--ink-muted)]">
+                {p.ultimoEvento ? `Último registro em ${dataBr(p.ultimoEvento)}` : "Sem registros ainda"}
               </div>
             </Link>
           );
         })}
-        {participantes.length === 0 && <p className="px-5 py-6 text-sm text-[var(--ink-muted)]">Cadastre a primeira mentora para começar a mentoria.</p>}
+        {participantes.length === 0 && (
+          <p className="text-sm text-[var(--ink-muted)]">Cadastre a primeira mentora para começar a mentoria.</p>
+        )}
       </div>
     </div>
   );

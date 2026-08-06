@@ -14,7 +14,7 @@ export default async function ConfiguracoesPage() {
   const iaAtiva = !!process.env.OPENROUTER_API_KEY;
 
   return (
-    <div className="max-w-2xl space-y-6">
+    <div className="max-w-4xl space-y-6">
       <div>
         <h1 className="text-[26px] font-bold text-[var(--brand)]">Configurações</h1>
         <p className="mt-1 text-[13.5px] text-[var(--ink-muted)]">

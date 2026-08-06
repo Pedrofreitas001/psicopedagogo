@@ -63,7 +63,7 @@ export default async function CasoPage({ params }: { params: Promise<{ id: strin
   const iconeSecao = "material-symbols-outlined text-[20px] text-[var(--brand)]";
 
   return (
-    <div className="max-w-3xl space-y-6">
+    <div className="max-w-6xl space-y-6">
       {participante && user.papel === "mentora" && (
         <Link href={`/participantes/${participante.id}`} className="inline-flex items-center gap-1 text-[13px] text-[var(--ink-muted)] hover:text-[var(--brand)]">
           <span className="material-symbols-outlined text-[16px]">arrow_back</span> {participante.nome}
@@ -109,7 +109,7 @@ export default async function CasoPage({ params }: { params: Promise<{ id: strin
         </div>
       </div>
 
-      <nav className="sticky top-16 z-10 -mx-1 flex gap-1 overflow-x-auto px-1 py-2 bg-[var(--page)]/90 backdrop-blur-sm text-[12.5px]">
+      <nav className="sticky top-16 z-10 -mx-1 flex flex-wrap gap-1.5 px-1 py-2 bg-[var(--page)]/90 backdrop-blur-sm text-[12.5px]">
         {[
           { href: "#ficha", label: "Ficha" },
           { href: "#hipoteses", label: "Hipóteses" },
@@ -122,7 +122,7 @@ export default async function CasoPage({ params }: { params: Promise<{ id: strin
           <a
             key={s.href}
             href={s.href}
-            className="shrink-0 rounded-full border border-[var(--grid)] bg-[var(--surface-1)] px-3 py-1.5 text-[var(--ink-2)] hover:border-[var(--brand)] hover:text-[var(--brand)] transition-colors"
+            className="flex-1 min-w-[110px] text-center rounded-full border border-[var(--grid)] bg-[var(--surface-1)] px-3 py-1.5 text-[var(--ink-2)] hover:border-[var(--brand)] hover:text-[var(--brand)] transition-colors"
           >
             {s.label}
           </a>
@@ -153,12 +153,14 @@ export default async function CasoPage({ params }: { params: Promise<{ id: strin
         </div>
       </div>
 
-      <div id="hipoteses" className={`${secao} scroll-mt-24`}>
-        <HipotesesCaso caseId={caso.id} hipoteses={hipoteses} />
-      </div>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+        <div id="hipoteses" className={`${secao} scroll-mt-24`}>
+          <HipotesesCaso caseId={caso.id} hipoteses={hipoteses} />
+        </div>
 
-      <div id="protocolos" className={`${secao} scroll-mt-24`}>
-        <ProtocolosCaso caseId={caso.id} assignments={assignments} />
+        <div id="protocolos" className={`${secao} scroll-mt-24`}>
+          <ProtocolosCaso caseId={caso.id} assignments={assignments} />
+        </div>
       </div>
 
       <div id="registros" className={`${secao} scroll-mt-24`}>
