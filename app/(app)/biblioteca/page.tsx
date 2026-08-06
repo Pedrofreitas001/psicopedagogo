@@ -25,7 +25,7 @@ export default async function BibliotecaPage() {
   const opcoesCategoria = cats.map((c) => ({ id: c.id, nome: caminho(c, cats) })).sort((a, b) => a.nome.localeCompare(b.nome));
 
   return (
-    <div className="max-w-2xl">
+    <div className="max-w-6xl">
       <h1 className="text-[26px] font-bold text-[var(--brand)]">Biblioteca</h1>
       <p className="mt-1 text-[13.5px] text-[var(--ink-muted)]">
         PDF, Word, PowerPoint e Excel organizados por pastas. Revise o conteúdo de cada arquivo e disponibilize para o assistente quando estiver pronto.
@@ -34,7 +34,7 @@ export default async function BibliotecaPage() {
         <UploadForm categorias={opcoesCategoria} />
         <NovaPasta categorias={opcoesCategoria} />
       </div>
-      <div className="mt-6 card rounded-2xl p-6">
+      <div className="mt-6">
         <BibliotecaArvore cats={cats} docs={docs.map((d) => ({ id: d.id, categoriaId: d.categoriaId, nome: d.nome, tipo: d.tipo, conteudo: d.conteudo, disponivelAssistente: d.disponivelAssistente }))} />
       </div>
     </div>
