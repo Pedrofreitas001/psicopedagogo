@@ -46,18 +46,16 @@ export default async function ConfiguracoesPage() {
 
       <div className="card rounded-2xl p-6">
         <h2 className="flex items-center gap-2 text-[15px] font-semibold"><span className="material-symbols-outlined text-[20px] text-[var(--brand)]">cable</span> Ambiente</h2>
-        <ul className="mt-3 space-y-1.5 text-[13px] text-[var(--ink-2)]">
+        <ul className="mt-3 space-y-1.5 text-[13px]">
           {[
             [authEnabled(), "Login real (Supabase Auth) ativo", "Modo demo — defina SUPABASE_URL e SUPABASE_ANON_KEY para exigir login real"],
             [postgresEnabled(), "Dados persistidos no Postgres do Supabase", "Dados em SQLite local — em serverless não persistem entre instâncias; defina SUPABASE_SERVICE_ROLE_KEY"],
             [storageEnabled(), "Arquivos no Supabase Storage", "Arquivos em disco local — defina SUPABASE_SERVICE_ROLE_KEY para usar o Supabase Storage"],
             [iaAtiva, "Redação das respostas via OpenRouter", "Assistente em modo offline — defina OPENROUTER_API_KEY para respostas redigidas por IA"],
           ].map(([ok, msgOn, msgOff], i) => (
-            <li key={i} className="flex items-start gap-1.5">
-              <span className={`material-symbols-outlined text-[15px] shrink-0 mt-px ${ok ? "text-emerald-600" : "text-amber-600"}`}>
-                {ok ? "check_circle" : "warning"}
-              </span>
-              <span>{ok ? msgOn : msgOff}</span>
+            <li key={i} className={ok ? "text-emerald-700" : "text-amber-700"}>
+              <span className="font-semibold">{ok ? "✓ " : "! "}</span>
+              {ok ? msgOn : msgOff}
             </li>
           ))}
         </ul>

@@ -74,9 +74,9 @@ export default function Sidebar({
       <button
         onClick={() => setAbertaMobile(true)}
         title="Abrir menu"
-        className="md:hidden fixed top-3.5 left-4 z-30 w-9 h-9 rounded-lg bg-[var(--surface-1)] border border-[var(--grid)] shadow-sm grid place-items-center text-[var(--ink-2)]"
+        className="md:hidden fixed top-3.5 left-4 z-30 w-9 h-9 rounded-lg bg-[var(--surface-1)] border border-[var(--grid)] shadow-sm grid place-items-center text-[var(--ink-2)] text-[18px] leading-none"
       >
-        <span className="material-symbols-outlined text-[20px]">menu</span>
+        ☰
       </button>
       {abertaMobile && (
         <div className="md:hidden fixed inset-0 bg-black/40 z-40" onClick={() => setAbertaMobile(false)} />
@@ -89,9 +89,9 @@ export default function Sidebar({
         <button
           onClick={() => setAbertaMobile(false)}
           title="Fechar menu"
-          className="md:hidden absolute right-4 top-4 w-8 h-8 rounded-full grid place-items-center text-[var(--ink-muted)] hover:bg-black/5"
+          className="md:hidden absolute right-4 top-4 w-8 h-8 rounded-full grid place-items-center text-[var(--ink-muted)] hover:bg-black/5 text-[16px] leading-none"
         >
-          <span className="material-symbols-outlined text-[20px]">close</span>
+          ✕
         </button>
         <button
           onClick={alternarColapso}

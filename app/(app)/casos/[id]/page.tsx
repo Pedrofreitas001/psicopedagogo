@@ -20,16 +20,6 @@ import UploadForm from "@/components/UploadForm";
 import ChatAssistente from "@/components/ChatAssistente";
 import ProximoPassoCaso from "@/components/ProximoPassoCaso";
 
-const ICONE: Record<string, string> = {
-  pdf: "picture_as_pdf",
-  docx: "description",
-  doc: "description",
-  pptx: "slideshow",
-  ppt: "slideshow",
-  xlsx: "table_chart",
-  xls: "table_chart",
-};
-
 function Campo({ titulo, valor }: { titulo: string; valor: string }) {
   return (
     <div>
@@ -183,9 +173,7 @@ export default async function CasoPage({ params }: { params: Promise<{ id: strin
         <div className="mt-3 divide-y divide-black/5">
           {docs.map((d) => (
             <a key={d.id} href={`/api/documentos/${d.id}`} className="flex items-center gap-2.5 py-2.5 text-[13.5px] hover:text-[var(--brand-deep)]">
-              <span className={`material-symbols-outlined text-[17px] ${ICONE[d.tipo] ? "text-[var(--brand-deep)]" : "text-[var(--ink-muted)]"}`}>
-                {ICONE[d.tipo] ?? "description"}
-              </span>
+              <span className="material-symbols-outlined text-[17px] text-[var(--brand-deep)]">attach_file</span>
               {d.nome}
               <span className="ml-auto text-[11.5px] text-[var(--ink-muted)]">{d.criadoEm.slice(0, 10).split("-").reverse().join("/")}</span>
             </a>
