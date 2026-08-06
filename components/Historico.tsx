@@ -6,7 +6,7 @@ const ICONE: Record<string, string> = {
   conversa: "forum",
   material: "auto_stories",
   observacao: "assignment",
-  resumo: "auto_awesome",
+  resumo: "assignment",
   sessao: "history_edu",
   protocolo: "fact_check",
   hipotese: "lightbulb",
