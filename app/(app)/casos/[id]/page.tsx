@@ -63,7 +63,28 @@ export default async function CasoPage({ params }: { params: Promise<{ id: strin
   const iconeSecao = "material-symbols-outlined text-[20px] text-[var(--brand)]";
 
   return (
-    <div className="max-w-6xl space-y-6">
+    <>
+      <nav className="sticky top-0 z-10 -mx-4 md:-mx-10 -mt-6 md:-mt-8 mb-6 flex flex-wrap gap-1.5 px-4 md:px-10 py-3 bg-[var(--page)]/95 backdrop-blur-sm border-b border-[var(--grid)] text-[12.5px]">
+        {[
+          { href: "#ficha", label: "Ficha" },
+          { href: "#hipoteses", label: "Hipóteses" },
+          { href: "#protocolos", label: "Protocolos" },
+          { href: "#registros", label: "Registros" },
+          { href: "#mentor-caso", label: "Raciocinar" },
+          { href: "#arquivos", label: "Arquivos" },
+          { href: "#linha-do-tempo", label: "Linha do tempo" },
+        ].map((s) => (
+          <a
+            key={s.href}
+            href={s.href}
+            className="flex-1 min-w-[110px] text-center rounded-full border border-[var(--grid)] bg-[var(--surface-1)] px-3 py-1.5 text-[var(--ink-2)] hover:border-[var(--brand)] hover:text-[var(--brand)] transition-colors"
+          >
+            {s.label}
+          </a>
+        ))}
+      </nav>
+
+      <div className="max-w-6xl space-y-6">
       {participante && user.papel === "mentora" && (
         <Link href={`/participantes/${participante.id}`} className="inline-flex items-center gap-1 text-[13px] text-[var(--ink-muted)] hover:text-[var(--brand)]">
           <span className="material-symbols-outlined text-[16px]">arrow_back</span> {participante.nome}
@@ -109,26 +130,6 @@ export default async function CasoPage({ params }: { params: Promise<{ id: strin
         </div>
       </div>
 
-      <nav className="sticky top-16 z-10 -mx-1 flex flex-wrap gap-1.5 px-1 py-2 bg-[var(--page)]/90 backdrop-blur-sm text-[12.5px]">
-        {[
-          { href: "#ficha", label: "Ficha" },
-          { href: "#hipoteses", label: "Hipóteses" },
-          { href: "#protocolos", label: "Protocolos" },
-          { href: "#registros", label: "Registros" },
-          { href: "#mentor-caso", label: "Raciocinar" },
-          { href: "#arquivos", label: "Arquivos" },
-          { href: "#linha-do-tempo", label: "Linha do tempo" },
-        ].map((s) => (
-          <a
-            key={s.href}
-            href={s.href}
-            className="flex-1 min-w-[110px] text-center rounded-full border border-[var(--grid)] bg-[var(--surface-1)] px-3 py-1.5 text-[var(--ink-2)] hover:border-[var(--brand)] hover:text-[var(--brand)] transition-colors"
-          >
-            {s.label}
-          </a>
-        ))}
-      </nav>
-
       <ProximoPassoCaso etapa={etapa} />
 
       <div id="ficha" className={`${secao} scroll-mt-24`}>
@@ -172,7 +173,9 @@ export default async function CasoPage({ params }: { params: Promise<{ id: strin
           <span className={iconeSecao}>forum</span> Raciocinar sobre {caso.nome}
         </h2>
         <p className="mt-1 mb-4 text-[12.5px] text-[var(--ink-muted)]">A conversa fica registrada na linha do tempo deste caso.</p>
-        <ChatAssistente casoFixo={caso.id} />
+        <div className="h-[600px] min-h-[420px]">
+          <ChatAssistente casoFixo={caso.id} alturaFixa />
+        </div>
       </div>
 
       <div id="arquivos" className={`${secao} scroll-mt-24`}>
@@ -202,6 +205,7 @@ export default async function CasoPage({ params }: { params: Promise<{ id: strin
         </h2>
         <Historico eventos={eventos} />
       </div>
-    </div>
+      </div>
+    </>
   );
 }
