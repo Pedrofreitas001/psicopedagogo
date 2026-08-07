@@ -64,7 +64,7 @@ export default async function CasoPage({ params }: { params: Promise<{ id: strin
 
   return (
     <>
-      <nav className="sticky top-0 z-10 -mx-4 md:-mx-10 -mt-6 md:-mt-8 mb-6 flex flex-wrap gap-1.5 px-4 md:px-10 py-3 bg-[var(--surface-1)] border-b border-[var(--grid)] shadow-sm text-[12.5px]">
+      <nav className="sticky -top-6 md:-top-8 z-10 -mx-4 md:-mx-10 -mt-6 md:-mt-8 mb-6 flex flex-wrap gap-1.5 px-4 md:px-10 py-3 bg-[var(--surface-1)] border-b border-[var(--grid)] shadow-sm text-[12.5px]">
         {[
           { href: "#ficha", label: "Ficha" },
           { href: "#hipoteses", label: "Hipóteses" },
