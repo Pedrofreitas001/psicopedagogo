@@ -28,20 +28,20 @@ export default async function AssistentePage() {
   }
 
   return (
-    <div className="h-full min-h-0 flex flex-col bg-[var(--surface-1)] rounded-2xl border border-[var(--grid)] shadow-[var(--card-shadow)] overflow-hidden">
-      <div className="shrink-0 flex items-center gap-3 px-5 md:px-8 py-4 border-b border-[var(--grid)] bg-[var(--surface-1)]">
-        <div className="w-10 h-10 rounded-2xl bg-[var(--brand)]/10 text-[var(--brand)] grid place-items-center shrink-0">
-          <span className="material-symbols-outlined fill-icon text-[22px]">psychology</span>
+    <div className="h-full min-h-0 flex flex-col bg-[var(--surface-1)]">
+      <div className="shrink-0 flex items-center gap-3 px-5 md:px-8 py-3.5 border-b border-[var(--grid)]">
+        <div className="w-9 h-9 rounded-2xl bg-[var(--brand)]/10 text-[var(--brand)] grid place-items-center shrink-0">
+          <span className="material-symbols-outlined fill-icon text-[20px]">psychology</span>
         </div>
         <div className="min-w-0">
-          <h1 className="text-[18px] font-bold text-[var(--brand)] leading-tight">Mentor Clínico</h1>
-          <p className="text-[12.5px] text-[var(--ink-muted)] truncate">
+          <h1 className="text-[16px] font-bold text-[var(--brand)] leading-tight">Mentor Clínico</h1>
+          <p className="text-[12px] text-[var(--ink-muted)] truncate hidden sm:block">
             Conduz o raciocínio clínico por perguntas — com base no protocolo, nas hipóteses e no histórico de cada caso.
           </p>
         </div>
       </div>
 
-      <div className="flex-1 min-h-0 flex justify-center bg-[var(--surface-1)] overflow-hidden">
+      <div className="flex-1 min-h-0 flex justify-center overflow-hidden">
         <div className="w-full max-w-4xl h-full min-h-0 px-5 md:px-8 py-5 flex flex-col">
           <ChatAssistente casos={casos} permiteGeral={permiteGeral} sugestoes={sugestoes} alturaFixa />
         </div>

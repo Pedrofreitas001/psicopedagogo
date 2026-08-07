@@ -3,6 +3,7 @@ import { listUsers, getWorkspaceName } from "@/lib/data";
 import { getCurrentUser } from "@/lib/auth";
 import { authEnabled } from "@/lib/supabase-auth";
 import Sidebar from "@/components/Sidebar";
+import MainArea from "@/components/MainArea";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const current = await getCurrentUser();
@@ -34,7 +35,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             </div>
           </div>
         </header>
-        <main className="flex-1 min-h-0 overflow-y-auto px-4 py-6 md:px-10 md:py-8 max-w-[1700px] w-full">{children}</main>
+        <MainArea>{children}</MainArea>
       </div>
     </div>
   );
