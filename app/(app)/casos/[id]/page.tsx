@@ -154,14 +154,12 @@ export default async function CasoPage({ params }: { params: Promise<{ id: strin
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
-        <div id="hipoteses" className={`${secao} scroll-mt-24`}>
-          <HipotesesCaso caseId={caso.id} hipoteses={hipoteses} />
-        </div>
+      <div id="hipoteses" className={`${secao} scroll-mt-24`}>
+        <HipotesesCaso caseId={caso.id} hipoteses={hipoteses} />
+      </div>
 
-        <div id="protocolos" className={`${secao} scroll-mt-24`}>
-          <ProtocolosCaso caseId={caso.id} assignments={assignments} />
-        </div>
+      <div id="protocolos" className={`${secao} scroll-mt-24`}>
+        <ProtocolosCaso caseId={caso.id} assignments={assignments} />
       </div>
 
       <div id="registros" className={`${secao} scroll-mt-24`}>
